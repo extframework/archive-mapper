@@ -11,6 +11,10 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven {
+        isAllowInsecureProtocol = true
+        url = uri("http://repo.yakclient.net/snapshots")
+    }
 }
 
 tasks.wrapper {
@@ -25,6 +29,7 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("reflect"))
     testImplementation(kotlin("test"))
+    implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 }
 
 tasks.compileKotlin {

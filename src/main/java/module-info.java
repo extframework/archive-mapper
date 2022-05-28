@@ -1,12 +1,6 @@
-import net.yakclient.archive.mapper.ParserProvider;
-import net.yakclient.archive.mapper.parsers.DefaultParserProvider;
-
 module yakclient.archive.mapper {
     requires kotlin.stdlib;
+    requires yakclient.common.util;
 
     exports net.yakclient.archive.mapper;
-
-    uses ParserProvider;
-
-    provides ParserProvider with DefaultParserProvider;
 }

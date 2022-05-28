@@ -82,7 +82,7 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Pro Guard Parsing`() {
-        val parser = ProGuardMappingParser()
+        val parser = Parsers[Parsers.PRO_GUARD]!!
 
         val mappings = parser.parse(URI("https://launcher.mojang.com/v1/objects/a661c6a55a0600bd391bdbbd6827654c05b2109c/client.txt"))
 

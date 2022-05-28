@@ -5,19 +5,18 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 
-private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""// "com.mojang.blaze3d.audio.Channel -> drj:"
-private const val METHOD_REGEX =
-    "^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S+)\\) -> (\\S+)$" //144:144:int calculateBufferSize(javax.sound.sampled.AudioFormat,int) -> a
-private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$""" //boolean supportsDisconnections -> f
+private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""
+private const val METHOD_REGEX = "^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S+)\\) -> (\\S+)$"
+private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$"""
 
 private const val ARCHIVE_NAME = "<none>"
 
-internal const val PRO_GUARD_PARSER_NAME = "proguard"
-
-public class ProGuardMappingParser : MappingParser {
+public object ProGuardMappingParser : MappingParser {
     private val classMatcher = Regex(CLASS_REGEX)
     private val methodMatcher = Regex(METHOD_REGEX)
     private val fieldMatcher = Regex(FIELD_REGEX)
+
+    override val name: String = "proguard"
 
     override fun parse(mappingsIn: InputStream): MappedArchive =
         BufferedReader(InputStreamReader(mappingsIn)).use { reader ->

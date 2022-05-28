@@ -5,6 +5,8 @@ import java.net.URI
 import java.net.URL
 
 public interface MappingParser {
+    public val name: String
+
     public fun parse(mappingsIn: InputStream) : MappedArchive
 
     public fun parse(mappings: URL) : MappedArchive = parse(mappings.openStream())
