@@ -23,7 +23,7 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Method regex`() {
-        val regex = Regex("^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S+)\\) -> (\\S+)$")
+        val regex = Regex("^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S*)\\) -> (\\S+)$")
 
         val input = "144:144:int calculateBufferSize(javax.sound.sampled.AudioFormat,int) -> a"
         assert(regex.matches(input))
