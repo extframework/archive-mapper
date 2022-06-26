@@ -6,7 +6,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 
 private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""
-private const val METHOD_REGEX = "^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S+)\\) -> (\\S+)$"
+private const val METHOD_REGEX = "^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S*)\\) -> (\\S+)$"
 private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$"""
 
 private const val ARCHIVE_NAME = "<none>"
@@ -71,7 +71,7 @@ public object ProGuardMappingParser : MappingParser {
                                 result[6], // Fake name
                                 result[1].toInt(), // Start line
                                 result[2].toInt(), // End line
-                                result[5].split(',').map(::toTypeDescriptor), // Parameters
+                                if (result[5].isEmpty()) emptyList() else result[5].split(',').map(::toTypeDescriptor), // Parameters
                                 toTypeDescriptor(result[3]) // Return type
                             )
                         )
