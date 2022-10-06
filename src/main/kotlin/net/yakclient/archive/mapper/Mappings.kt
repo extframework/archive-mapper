@@ -14,8 +14,10 @@ public data class MappedClass(
 public data class MappedMethod(
     override val realName: String,
     override val fakeName: String,
-    public val lnStart: Int,
-    public val lnEnd: Int,
+    public val lnStart: Int?,
+    public val lnEnd: Int?,
+    public val originalLnStart: Int?,
+    public val originalLnEnd: Int?,
     public val parameters: List<DescriptorType>,
     public val returnType: DescriptorType
 ) : MappedNode

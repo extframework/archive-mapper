@@ -6,7 +6,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 
 private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""
-private const val METHOD_REGEX = "^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S+)\\) -> (\\S+)$"
+private const val METHOD_REGEX = """^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)"""
 private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$"""
 
 private const val ARCHIVE_NAME = "<none>"
@@ -62,17 +62,19 @@ public object ProGuardMappingParser : MappingParser {
                     // Check if the current line matched is a method definition
                     if (methodMatcher.matches(line)) {
                         // Get the result of this line, we know the match is not null due to the check above
-                        val result = methodMatcher.matchEntire(line)!!.groupValues
+                        val result = methodMatcher.matchEntire(line)!!.groups as MatchNamedGroupCollection
 
                         // Read the groups, map the types, and add a method node to the methods
                         methods.add(
                             MappedMethod(
-                                result[4], // Real name
-                                result[6], // Fake name
-                                result[1].toInt(), // Start line
-                                result[2].toInt(), // End line
-                                result[5].split(',').map(::toTypeDescriptor), // Parameters
-                                toTypeDescriptor(result[3]) // Return type
+                                realName = result["name"]!!.value, // Real name
+                                fakeName = result["obf"]!!.value, // Fake name
+                                lnStart = result["from"]?.value?.toIntOrNull(), // Start line
+                                lnEnd = result["to"]?.value?.toIntOrNull(), // End line
+                                originalLnStart = result["originalFrom"]?.value?.toIntOrNull(), // Original start line
+                                originalLnEnd = result["originalTo"]?.value?.toIntOrNull(), // Original end line
+                                parameters = if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(',').map(::toTypeDescriptor), // Parameters
+                                returnType = toTypeDescriptor(result["ret"]!!.value) // Return type
                             )
                         )
                     }
@@ -89,6 +91,10 @@ public object ProGuardMappingParser : MappingParser {
                                 toTypeDescriptor(result[1]) // Type
                             )
                         )
+                    }
+                    // Else, if the current line is source file attribute
+                    else if (line.startsWith("#")) {
+                        continue
                     }
                     // If its not a field or method, then the class definition is over, and we can break.
                     else break

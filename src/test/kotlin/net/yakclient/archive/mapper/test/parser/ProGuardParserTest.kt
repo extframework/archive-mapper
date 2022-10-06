@@ -23,19 +23,19 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Method regex`() {
-        val regex = Regex("^(\\d+):(\\d+):(\\S+) (\\S+)\\((\\S+)\\) -> (\\S+)$")
+        val regex = Regex("""^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)""")
 
         val input = "144:144:int calculateBufferSize(javax.sound.sampled.AudioFormat,int) -> a"
         assert(regex.matches(input))
 
-        val result = regex.matchEntire(input)!!.groupValues
+        val result = regex.matchEntire(input)!!.groups as MatchNamedGroupCollection
 
-        assert(result[1] == "144")
-        assert(result[2] == "144")
-        assert(result[3] == "int")
-        assert(result[4] == "calculateBufferSize")
-        assert(result[5] == "javax.sound.sampled.AudioFormat,int")
-        assert(result[6] == "a")
+        assert(result["from"]!!.value == "144")
+        assert(result["to"]!!.value == "144")
+        assert(result["ret"]!!.value == "int")
+        assert(result["name"]!!.value == "calculateBufferSize")
+        assert(result["args"]!!.value == "javax.sound.sampled.AudioFormat,int")
+        assert(result["obf"]!!.value == "a")
     }
 
     @Test
