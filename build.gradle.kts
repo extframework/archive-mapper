@@ -81,6 +81,13 @@ publishing {
 
                 packaging = "jar"
 
+                withXml {
+                    val repositoriesNode = asNode().appendNode("repositories")
+                    val yakclientRepositoryNode = repositoriesNode.appendNode("repository")
+                    yakclientRepositoryNode.appendNode("id", "yakclient")
+                    yakclientRepositoryNode.appendNode("url", "http://maven.yakclient.net/snapshots")
+                }
+
                 developers {
                     developer {
                         id.set("Chestly")
