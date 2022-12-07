@@ -17,14 +17,18 @@ public enum class PrimitiveTypeDescriptor(
 }
 
 public class ClassTypeDescriptor(
-    public val classname: String
+    _classname: String
 ) : DescriptorType {
-    override val descriptor: String = "L${classname.replace('.', '/')};"
+    public val parts: List<String> = _classname.split('/')
+    public val packagePath: List<String> = parts.take(parts.size - 1)
+    public val classname: String = parts.last()
+    public val fullQualifier: String = _classname
+
+    override val descriptor: String = "L$fullQualifier;"
 }
 
 public class ArrayTypeDescriptor(
     public val arrayType: DescriptorType
 ) : DescriptorType {
-
     override val descriptor: String = "[${arrayType.descriptor}"
 }

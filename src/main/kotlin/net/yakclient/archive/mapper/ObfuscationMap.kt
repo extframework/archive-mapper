@@ -3,7 +3,6 @@ package net.yakclient.archive.mapper
 public class ObfuscationMap<V : MappedNode>(
     private val delegate: Map<Pair<String, String>, V> = HashMap()
 ) : Map<Pair<String, String>, V> by delegate {
-
     public constructor(nodes: List<V>) : this(nodes.associateBy { it.realName to it.fakeName })
 
     private val realNames = delegate.mapKeys { it.key.first }

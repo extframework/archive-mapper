@@ -1,7 +1,6 @@
 package net.yakclient.archive.mapper.test.parser
 
 import net.yakclient.archive.mapper.*
-import net.yakclient.archive.mapper.parsers.ProGuardMappingParser
 import java.net.URI
 import kotlin.test.Test
 
@@ -88,7 +87,7 @@ class ProGuardParserTest {
 
         println(mappings.classes.size)
 
-        val title = checkNotNull(mappings.classes.getByReal("net.minecraft.client.gui.screens.TitleScreen"))
+        val title = checkNotNull(mappings.classes.getByReal("net/minecraft/client/gui/screens/TitleScreen"))
 
         val method = title.methods.getByFake("a(Lcom/mojang/blaze3d/vertex/PoseStack;IIF)V")
 

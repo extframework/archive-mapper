@@ -6,7 +6,8 @@ import java.io.InputStream
 import java.io.InputStreamReader
 
 private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""
-private const val METHOD_REGEX = """^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)"""
+private const val METHOD_REGEX =
+    """^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)"""
 private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$"""
 
 private const val ARCHIVE_NAME = "<none>"
@@ -73,7 +74,9 @@ public object ProGuardMappingParser : MappingParser {
                                 lnEnd = result["to"]?.value?.toIntOrNull(), // End line
                                 originalLnStart = result["originalFrom"]?.value?.toIntOrNull(), // Original start line
                                 originalLnEnd = result["originalTo"]?.value?.toIntOrNull(), // Original end line
-                                parameters = if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(',').map(::toTypeDescriptor), // Parameters
+                                parameters = if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(
+                                    ','
+                                ).map(::toTypeDescriptor), // Parameters
                                 returnType = toTypeDescriptor(result["ret"]!!.value) // Return type
                             )
                         )
@@ -103,8 +106,8 @@ public object ProGuardMappingParser : MappingParser {
                 // Method and field reading is done, create a mapped class and add it to the classes list.
                 classes.add(
                     MappedClass(
-                        realName,
-                        fakeName,
+                        realName.replace('.', '/'),
+                        fakeName.replace('.', '/'),
                         methods.toObfuscationMapping { name, node -> // Mapping method names to their bytecode equivalent as overloading is possible, and we can't relly on ambiguity of names alone.
                             "$name(${
                                 node.parameters.joinToString("", transform = DescriptorType::descriptor)
@@ -134,7 +137,7 @@ public object ProGuardMappingParser : MappingParser {
                 val type = desc.removeSuffix("[]")
 
                 ArrayTypeDescriptor(toTypeDescriptor(type))
-            } else ClassTypeDescriptor(desc)
+            } else ClassTypeDescriptor(desc.replace('.', '/'))
         }
     }
 }
