@@ -1,8 +1,8 @@
 package net.yakclient.archive.mapper
 
-public enum class PrimitiveTypeDescriptor(
+public enum class PrimitiveTypeIdentifier(
     _descriptor: Char
-) : DescriptorType {
+) : TypeIdentifier {
     BOOLEAN('Z'),
     CHAR('C'),
     BYTE('B'),
@@ -16,19 +16,26 @@ public enum class PrimitiveTypeDescriptor(
     override val descriptor: String = _descriptor.toString()
 }
 
-public class ClassTypeDescriptor(
-    _classname: String
-) : DescriptorType {
-    public val parts: List<String> = _classname.split('/')
+public data class ClassTypeIdentifier(
+    public val fullQualifier: String,
+) : TypeIdentifier {
+    public val parts: List<String> = fullQualifier.split('/')
     public val packagePath: List<String> = parts.take(parts.size - 1)
     public val classname: String = parts.last()
-    public val fullQualifier: String = _classname
 
     override val descriptor: String = "L$fullQualifier;"
 }
 
-public class ArrayTypeDescriptor(
-    public val arrayType: DescriptorType
-) : DescriptorType {
-    override val descriptor: String = "[${arrayType.descriptor}"
+public interface WrappedTypeIdentifier : TypeIdentifier {
+    public val innerType: TypeIdentifier
+
+    public fun withNew(innerType: TypeIdentifier): WrappedTypeIdentifier // Self
+}
+
+public data class ArrayTypeIdentifier(
+    override val innerType: TypeIdentifier
+) : WrappedTypeIdentifier {
+    override val descriptor: String = "[${innerType.descriptor}"
+
+    override fun withNew(innerType: TypeIdentifier): WrappedTypeIdentifier = ArrayTypeIdentifier(innerType)
 }
