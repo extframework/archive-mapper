@@ -1,6 +1,7 @@
 package net.yakclient.archive.mapper.test.parser
 
 import net.yakclient.archive.mapper.*
+import net.yakclient.archive.mapper.parsers.ProGuardMappingParser
 import java.net.URI
 import kotlin.test.Test
 
@@ -82,7 +83,7 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Pro Guard Parsing`() {
-        val parser = Parsers[Parsers.PRO_GUARD]!!
+        val parser = ProGuardMappingParser
 
         val mappings = parser.parse(
             URI("https://launcher.mojang.com/v1/objects/a661c6a55a0600bd391bdbbd6827654c05b2109c/client.txt").toURL()
