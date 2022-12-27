@@ -1,5 +1,5 @@
 package net.yakclient.archive.mapper
 
-public interface DescriptorType {
+public interface TypeIdentifier {
     public val descriptor: String
 }

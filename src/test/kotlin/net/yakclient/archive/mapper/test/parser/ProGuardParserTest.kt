@@ -1,6 +1,7 @@
 package net.yakclient.archive.mapper.test.parser
 
 import net.yakclient.archive.mapper.*
+import net.yakclient.archive.mapper.parsers.ProGuardMappingParser
 import java.net.URI
 import kotlin.test.Test
 
@@ -22,7 +23,8 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Method regex`() {
-        val regex = Regex("""^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)""")
+        val regex =
+            Regex("""^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)""")
 
         val input = "144:144:int calculateBufferSize(javax.sound.sampled.AudioFormat,int) -> a"
         assert(regex.matches(input))
@@ -54,22 +56,22 @@ class ProGuardParserTest {
 
     @Test
     fun `Test type descriptor conversion`() {
-        fun toTypeDescriptor(desc: String): DescriptorType = when (desc) {
-            "boolean" -> PrimitiveTypeDescriptor.BOOLEAN
-            "char" -> PrimitiveTypeDescriptor.CHAR
-            "byte" -> PrimitiveTypeDescriptor.BYTE
-            "short" -> PrimitiveTypeDescriptor.SHORT
-            "int" -> PrimitiveTypeDescriptor.INT
-            "float" -> PrimitiveTypeDescriptor.FLOAT
-            "long" -> PrimitiveTypeDescriptor.LONG
-            "double" -> PrimitiveTypeDescriptor.DOUBLE
-            "void" -> PrimitiveTypeDescriptor.VOID
+        fun toTypeDescriptor(desc: String): TypeIdentifier = when (desc) {
+            "boolean" -> PrimitiveTypeIdentifier.BOOLEAN
+            "char" -> PrimitiveTypeIdentifier.CHAR
+            "byte" -> PrimitiveTypeIdentifier.BYTE
+            "short" -> PrimitiveTypeIdentifier.SHORT
+            "int" -> PrimitiveTypeIdentifier.INT
+            "float" -> PrimitiveTypeIdentifier.FLOAT
+            "long" -> PrimitiveTypeIdentifier.LONG
+            "double" -> PrimitiveTypeIdentifier.DOUBLE
+            "void" -> PrimitiveTypeIdentifier.VOID
             else -> {
                 if (desc.endsWith("[]")) {
                     val type = desc.removeSuffix("[]")
 
-                    ArrayTypeDescriptor(toTypeDescriptor(type))
-                } else ClassTypeDescriptor(desc)
+                    ArrayTypeIdentifier(toTypeDescriptor(type))
+                } else ClassTypeIdentifier(desc)
             }
         }
 
@@ -81,18 +83,35 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Pro Guard Parsing`() {
-        val parser = Parsers[Parsers.PRO_GUARD]!!
+        val parser = ProGuardMappingParser
 
-        val mappings = parser.parse(URI("https://launcher.mojang.com/v1/objects/a661c6a55a0600bd391bdbbd6827654c05b2109c/client.txt"))
+        val mappings = parser.parse(
+            URI("https://launcher.mojang.com/v1/objects/a661c6a55a0600bd391bdbbd6827654c05b2109c/client.txt").toURL()
+                .openStream()
+        )
 
         println(mappings.classes.size)
 
-        val title = checkNotNull(mappings.classes.getByReal("net/minecraft/client/gui/screens/TitleScreen"))
+        val title = checkNotNull(
+            mappings.classes[ClassIdentifier(
+                "net/minecraft/client/gui/screens/TitleScreen",
+                MappingType.REAL
+            )]
+        )
 
-        val method = title.methods.getByFake("a(Lcom/mojang/blaze3d/vertex/PoseStack;IIF)V")
+        val method = title.methods[MethodIdentifier(
+            "a",
+            listOf(
+                ClassTypeIdentifier("dtm"),
+                PrimitiveTypeIdentifier.INT,
+                PrimitiveTypeIdentifier.INT,
+                PrimitiveTypeIdentifier.FLOAT
+            ),
+            MappingType.FAKE
+        )]
 
         title.methods.size
 
-        println(method?.realName)
+        println(method?.realIdentifier?.name)
     }
 }

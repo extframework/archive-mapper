@@ -1,16 +1,17 @@
 package net.yakclient.archive.mapper.parsers
 
 import net.yakclient.archive.mapper.*
+import net.yakclient.common.util.readInputStream
 import java.io.BufferedReader
+import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
+import kotlin.properties.Delegates
 
 private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""
 private const val METHOD_REGEX =
     """^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<originalFrom>\d+))?(:(?<originalTo>\d+))?)?\s->\s(?<obf>[^:]+)"""
 private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$"""
-
-private const val ARCHIVE_NAME = "<none>"
 
 public object ProGuardMappingParser : MappingParser {
     private val classMatcher = Regex(CLASS_REGEX)
@@ -19,17 +20,46 @@ public object ProGuardMappingParser : MappingParser {
 
     override val name: String = "proguard"
 
-    override fun parse(mappingsIn: InputStream): MappedArchive =
-        BufferedReader(InputStreamReader(mappingsIn)).use { reader ->
+    override fun parse(mappingsIn: InputStream): ArchiveMapping {
+        val bytes = mappingsIn.readInputStream()
+
+        // Real to fake
+        val typeMappings = HashMap<String, String>()
+
+        // Creating an index of real to fake mappings to use for type conversions
+        BufferedReader(InputStreamReader(
+            ByteArrayInputStream(bytes)
+        )).use { reader ->
+            var rawLine = reader.readLine()
+            while (reader.ready()) {
+                val gv = classMatcher.matchEntire(rawLine.trim())?.groupValues
+
+                // Read a new line so we aren't stuck reading the same line forever.
+                rawLine = reader.readLine()
+
+                if (gv != null) {
+                    val (_, realName, fakeName) = gv
+
+                    typeMappings[realName.replace('.', '/')] = fakeName.replace('.', '/')
+                }
+            }
+        }
+
+        BufferedReader(InputStreamReader(ByteArrayInputStream(bytes))).use { reader ->
             // Converts a list to an ObfuscationMap
-            fun <T : MappedNode> List<T>.toObfuscationMapping(mapper: (String, T) -> String = { it, _ -> it }): ObfuscationMap<T> =
-                ObfuscationMap(associateBy { mapper(it.realName, it) to mapper(it.fakeName, it) })
+            fun <I : MappingIdentifier, T : MappingNode<I>> List<T>.toBiMap(): Map<I, T> {
+                val realMap = associateBy { it.realIdentifier }
+                val fakeMap = associateBy { it.fakeIdentifier }
+
+                return realMap + fakeMap
+            }
+//                ObfuscationMap(associateBy { mapper(it.realName, it) to mapper(it.fakeName, it) })
 
             // List of classes in archive.
-            val classes = ArrayList<MappedClass>()
+            val classes = ArrayList<ClassMapping>()
 
             // If there are no lines to read return an empty mapped archive.
-            if (!reader.ready()) return MappedArchive(ARCHIVE_NAME, ARCHIVE_NAME, ObfuscationMap())
+            if (!reader.ready()) return ArchiveMapping(HashMap())
 
             // Read the first line
             var line: String = reader.readLine().trim()
@@ -51,33 +81,59 @@ public object ProGuardMappingParser : MappingParser {
                 val (_, realName, fakeName) = gv
 
                 // List of methods in class
-                val methods = ArrayList<MappedMethod>()
+                val methods = ArrayList<MethodMapping>()
                 // List of fields in class
-                val fields = ArrayList<MappedField>()
+                val fields = ArrayList<FieldMapping>()
 
                 // Start reading lines
                 while (reader.ready()) {
                     // Update the line
                     line = reader.readLine().trim() // Read a new line
 
+                    fun fakeIdentifier(type: TypeIdentifier): TypeIdentifier {
+                        if (type is WrappedTypeIdentifier) type.withNew(fakeIdentifier(type.innerType))
+
+                        if (type !is ClassTypeIdentifier) return type
+                        val fullQualifier = typeMappings[type.fullQualifier]
+
+
+                        return if (fullQualifier != null) ClassTypeIdentifier(
+                            fullQualifier
+                        ) else type
+                    }
+
                     // Check if the current line matched is a method definition
                     if (methodMatcher.matches(line)) {
                         // Get the result of this line, we know the match is not null due to the check above
                         val result = methodMatcher.matchEntire(line)!!.groups as MatchNamedGroupCollection
 
+                        val realParameters: List<TypeIdentifier> =
+                            if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(
+                                ','
+                            ).map(::toTypeIdentifier)
+
                         // Read the groups, map the types, and add a method node to the methods
+                        val realReturnType = toTypeIdentifier(result["ret"]!!.value)
+
                         methods.add(
-                            MappedMethod(
-                                realName = result["name"]!!.value, // Real name
-                                fakeName = result["obf"]!!.value, // Fake name
+                            MethodMapping(
+                                realIdentifier = MethodIdentifier(
+                                    result["name"]!!.value,
+                                    realParameters,
+                                    MappingType.REAL
+                                ), // Real name
+                                fakeIdentifier = MethodIdentifier(
+                                    result["obf"]!!.value,
+                                    realParameters.map(::fakeIdentifier),
+                                    MappingType.FAKE
+                                ), // Fake name
                                 lnStart = result["from"]?.value?.toIntOrNull(), // Start line
                                 lnEnd = result["to"]?.value?.toIntOrNull(), // End line
                                 originalLnStart = result["originalFrom"]?.value?.toIntOrNull(), // Original start line
                                 originalLnEnd = result["originalTo"]?.value?.toIntOrNull(), // Original end line
-                                parameters = if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(
-                                    ','
-                                ).map(::toTypeDescriptor), // Parameters
-                                returnType = toTypeDescriptor(result["ret"]!!.value) // Return type
+                                // Parameters
+                                realReturnType = realReturnType, // Return type
+                                fakeReturnType = fakeIdentifier(realReturnType)
                             )
                         )
                     }
@@ -87,11 +143,19 @@ public object ProGuardMappingParser : MappingParser {
                         val result = fieldMatcher.matchEntire(line)!!.groupValues
 
                         // Create a mapped field and add to the fields list
+                        val realType = toTypeIdentifier(result[1])
                         fields.add(
-                            MappedField(
-                                result[2], // Real name
-                                result[3], // Fake name
-                                toTypeDescriptor(result[1]) // Type
+                            FieldMapping(
+                                FieldIdentifier(
+                                    result[2],
+                                    MappingType.REAL
+                                ),
+                                FieldIdentifier(
+                                    result[3],
+                                    MappingType.REAL
+                                ), // Fake name
+                                realType, // Type
+                                fakeIdentifier(realType)
                             )
                         )
                     }
@@ -105,40 +169,44 @@ public object ProGuardMappingParser : MappingParser {
 
                 // Method and field reading is done, create a mapped class and add it to the classes list.
                 classes.add(
-                    MappedClass(
-                        realName.replace('.', '/'),
-                        fakeName.replace('.', '/'),
-                        methods.toObfuscationMapping { name, node -> // Mapping method names to their bytecode equivalent as overloading is possible, and we can't relly on ambiguity of names alone.
-                            "$name(${
-                                node.parameters.joinToString("", transform = DescriptorType::descriptor)
-                            })${node.returnType.descriptor}"
-                        },
-                        fields.toObfuscationMapping()
+                    ClassMapping(
+                        ClassIdentifier(
+                            realName.replace('.', '/'),
+                            MappingType.REAL
+                        ),
+                        ClassIdentifier(
+                            fakeName.replace('.', '/'),
+                            MappingType.FAKE,
+                        ),
+                        methods.toBiMap(),
+                        fields.toBiMap()
                     )
                 )
             }
 
             // All classes read, can create a mapped archive and return.
-            return MappedArchive(ARCHIVE_NAME, ARCHIVE_NAME, classes.toObfuscationMapping())
+            return ArchiveMapping(classes.toBiMap())
         }
+    }
 
-    private fun toTypeDescriptor(desc: String): DescriptorType = when (desc) {
-        "boolean" -> PrimitiveTypeDescriptor.BOOLEAN
-        "char" -> PrimitiveTypeDescriptor.CHAR
-        "byte" -> PrimitiveTypeDescriptor.BYTE
-        "short" -> PrimitiveTypeDescriptor.SHORT
-        "int" -> PrimitiveTypeDescriptor.INT
-        "float" -> PrimitiveTypeDescriptor.FLOAT
-        "long" -> PrimitiveTypeDescriptor.LONG
-        "double" -> PrimitiveTypeDescriptor.DOUBLE
-        "void" -> PrimitiveTypeDescriptor.VOID
+    private fun toTypeIdentifier(desc: String): TypeIdentifier = when (desc) {
+        "boolean" -> PrimitiveTypeIdentifier.BOOLEAN
+        "char" -> PrimitiveTypeIdentifier.CHAR
+        "byte" -> PrimitiveTypeIdentifier.BYTE
+        "short" -> PrimitiveTypeIdentifier.SHORT
+        "int" -> PrimitiveTypeIdentifier.INT
+        "float" -> PrimitiveTypeIdentifier.FLOAT
+        "long" -> PrimitiveTypeIdentifier.LONG
+        "double" -> PrimitiveTypeIdentifier.DOUBLE
+        "void" -> PrimitiveTypeIdentifier.VOID
         else -> {
             if (desc.endsWith("[]")) {
                 val type = desc.removeSuffix("[]")
 
-                ArrayTypeDescriptor(toTypeDescriptor(type))
-            } else ClassTypeDescriptor(desc.replace('.', '/'))
+                ArrayTypeIdentifier(toTypeIdentifier(type))
+            } else ClassTypeIdentifier(desc.replace('.', '/'))
         }
     }
 }
+
 
