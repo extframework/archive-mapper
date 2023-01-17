@@ -9,51 +9,83 @@ plugins {
 group = "net.yakclient"
 version = "1.1-SNAPSHOT"
 
-repositories {
-    mavenCentral()
-    maven {
-        isAllowInsecureProtocol = true
-        url = uri("http://repo.yakclient.net/snapshots")
-    }
-}
-
 tasks.wrapper {
     gradleVersion = "7.2"
 }
 
-kotlin {
-    explicitApi()
-}
-
 dependencies {
-    implementation(kotlin("stdlib"))
-    implementation(kotlin("reflect"))
-    testImplementation(kotlin("test"))
     implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 }
 
-tasks.compileKotlin {
-    destinationDirectory.set(tasks.compileJava.get().destinationDirectory.asFile.get())
+allprojects {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "maven-publish")
+    apply(plugin = "org.jetbrains.dokka")
 
-
-    kotlinOptions {
-        jvmTarget = "17"
+    repositories {
+        mavenCentral()
+        maven {
+            isAllowInsecureProtocol = true
+            url = uri("http://repo.yakclient.net/snapshots")
+        }
     }
-}
 
-tasks.compileTestKotlin {
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        explicitApi()
     }
-}
 
-tasks.test {
-    useJUnitPlatform()
-}
+    dependencies {
+        implementation(kotlin("stdlib"))
+        implementation(kotlin("reflect"))
+        testImplementation(kotlin("test"))
+    }
 
-tasks.compileJava {
-    targetCompatibility = "17"
-    sourceCompatibility = "17"
+    tasks.compileKotlin {
+        destinationDirectory.set(tasks.compileJava.get().destinationDirectory.asFile.get())
+
+
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+
+    tasks.compileTestKotlin {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+
+    tasks.test {
+        useJUnitPlatform()
+    }
+
+    tasks.compileJava {
+        targetCompatibility = "17"
+        sourceCompatibility = "17"
+    }
+
+
+    publishing {
+        repositories {
+            if (!project.hasProperty("maven-user") || !project.hasProperty("maven-pass")) return@repositories
+
+            maven {
+                val repo = if (project.findProperty("isSnapshot") == "true") "snapshots" else "releases"
+
+                isAllowInsecureProtocol = true
+
+                url = uri("http://repo.yakclient.net/$repo")
+
+                credentials {
+                    username = project.findProperty("maven-user") as String
+                    password = project.findProperty("maven-pass") as String
+                }
+                authentication {
+                    create<BasicAuthentication>("basic")
+                }
+            }
+        }
+    }
 }
 
 task<Jar>("sourcesJar") {
@@ -65,7 +97,6 @@ task<Jar>("javadocJar") {
     archiveClassifier.set("javadoc")
     from(tasks.dokkaJavadoc)
 }
-
 publishing {
     publications {
         create<MavenPublication>("archive-mapper-maven") {
@@ -91,7 +122,6 @@ publishing {
 
                 developers {
                     developer {
-                        id.set("Chestly")
                         name.set("Durgan McBroom")
                     }
                 }
@@ -108,26 +138,6 @@ publishing {
                     developerConnection.set("scm:git:ssh://github.com:yakclient/archive-mapper.git")
                     url.set("https://github.com/yakclient/archive-mapper")
                 }
-            }
-        }
-    }
-
-    repositories {
-        if (!project.hasProperty("maven-user") || !project.hasProperty("maven-pass")) return@repositories
-
-        maven {
-            val repo = if (project.findProperty("isSnapshot") == "true") "snapshots" else "releases"
-
-            isAllowInsecureProtocol = true
-
-            url = uri("http://repo.yakclient.net/$repo")
-
-            credentials {
-                username = project.findProperty("maven-user") as String
-                password = project.findProperty("maven-pass") as String
-            }
-            authentication {
-                create<BasicAuthentication>("basic")
             }
         }
     }
