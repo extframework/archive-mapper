@@ -14,13 +14,13 @@ public fun ArchiveMapping.getMappedClass(jvmName: String, direction: MappingDire
     )]
 }
 
-public fun ArchiveMapping.mapClassName(jvmName: String, direction: MappingDirection): String {
+public fun ArchiveMapping.mapClassName(jvmName: String, direction: MappingDirection): String? {
     val mappedClass = getMappedClass(jvmName, direction)
 
     return when (direction) {
         TO_REAL -> mappedClass?.realIdentifier
         TO_FAKE -> mappedClass?.fakeIdentifier
-    }?.name ?: jvmName
+    }?.name
 }
 
 // All expected to be in jvm class format. ie. org/example/MyClass
@@ -31,7 +31,8 @@ public fun ArchiveMapping.mapType(jvmType: String, direction: MappingDirection):
     else if (jvmType.startsWith("[")) {
         "[" + mapType(jvmType.substring(1 until jvmType.length), direction)
     } else {
-        val mapClassName = mapClassName(jvmType.trim('L', ';'), direction)
+        val jvmName = jvmType.trim('L', ';')
+        val mapClassName = mapClassName(jvmName, direction) ?: jvmName
         "L$mapClassName;"
     }
 }
@@ -56,7 +57,7 @@ public fun ArchiveMapping.mapMethodSignature(cls: String, signature: String, dir
     val (name, desc, returnType) = MethodSignature.of(signature)
     checkNotNull(returnType) { "Cannot map a method signature with a non-existent return type. Signature was '$signature'" }
     val mappedDesc = mapMethodDesc("($desc)$returnType", direction)
-    return mapMethodName(cls, name, signature, direction) + mappedDesc
+    return (mapMethodName(cls, name, signature, direction) ?: name) + mappedDesc
 }
 
 // Maps a JVM type to a TypeIdentifier
@@ -82,7 +83,7 @@ public fun toTypeIdentifier(type: String): TypeIdentifier = when (type) {
     }
 }
 
-public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String, direction: MappingDirection): String {
+public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String, direction: MappingDirection): String? {
     val clsMapping = getMappedClass(cls, direction)
 
     val method = clsMapping?.methods?.get(
@@ -98,7 +99,23 @@ public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String,
     return when (direction) {
         TO_REAL -> method?.realIdentifier
         TO_FAKE -> method?.fakeIdentifier
-    }?.name ?: name
+    }?.name
+}
+
+public fun ArchiveMapping.mapFieldName(owner: String, name: String, direction: MappingDirection) : String? {
+    val mappedClass = getMappedClass(owner, direction)
+        ?.fields
+        ?.get(
+            FieldIdentifier(
+                name,
+                direction.asOppositeType()
+            )
+        )
+
+    return when (direction) {
+        TO_REAL -> mappedClass?.realIdentifier
+        TO_FAKE -> mappedClass?.fakeIdentifier
+    }?.name
 }
 
 internal fun MappingDirection.asOppositeType() : MappingType = when (this) {

@@ -107,12 +107,38 @@ class TestTypeMapping {
             mapOf(),
             mapOf()
         )
+
+        val superTypeMethod = MethodMapping(
+            MethodIdentifier(
+                "getRealName", listOf(), REAL
+            ),
+            MethodIdentifier(
+                "getFakeName", listOf(), FAKE
+            ),null,null,null,null,
+            PrimitiveTypeIdentifier.VOID,
+            PrimitiveTypeIdentifier.VOID
+        )
+
+        val superTypeMapping = ClassMapping(
+            ClassIdentifier(
+                "net/yakclient/archive/mapper/transform/test/RealSuperType", REAL
+            ),
+            ClassIdentifier("net/yakclient/archive/mapper/transform/test/FakeSuperType", FAKE),
+            mapOf(
+                superTypeMethod.realIdentifier to superTypeMethod,
+                superTypeMethod.fakeIdentifier to superTypeMethod
+            ),
+            mapOf()
+        )
+
         val mappings = ArchiveMapping(
             mapOf(
                 classMapping.realIdentifier to classMapping,
                 classMapping.fakeIdentifier to classMapping,
                 exceptionMapping.realIdentifier to exceptionMapping,
-                exceptionMapping.fakeIdentifier to exceptionMapping
+                exceptionMapping.fakeIdentifier to exceptionMapping,
+                superTypeMapping.realIdentifier to superTypeMapping,
+                superTypeMapping.fakeIdentifier to superTypeMapping
             )
         )
 
@@ -140,6 +166,8 @@ class TestTypeMapping {
         cls1.getMethod("doSomething")
             .also(Method::trySetAccessible)
             .invoke(cls1.getConstructor().also(Constructor<*>::trySetAccessible).newInstance())
+
+        println(cls1.interfaces)
 
         val classloader2 = object : ClassLoader(this::class.java.classLoader) {
             var loaded = false
@@ -202,9 +230,17 @@ data class RealException(
     override val message: String
 ) : Exception()
 
+interface RealSuperType {
+    val realName: String
+}
+
+interface FakeSuperType {
+    val fakeName: String
+}
+
 class ToTransform(
     val value: RealClass = RealClass()
-) {
+) : RealSuperType {
     fun doSomething() {
         value.apply {
             value.doSomethingElse("YAYA", "AHAH", "!!!!", "??")
@@ -224,6 +260,9 @@ class ToTransform(
         } catch (e: RealException) {
             println(e)
         }
+
+        println(realName)
+        println((this as RealSuperType).realName)
     }
 
     fun doSomethingWithAValue(cls: RealClass) {
@@ -231,4 +270,7 @@ class ToTransform(
 
         throw RealException("Idk, i just wanted to throw this")
     }
+
+    override val realName: String
+        get() = "Real?"
 }

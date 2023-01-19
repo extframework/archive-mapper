@@ -23,77 +23,102 @@ public fun mappingTransformConfigFor(
             node
         }
 
-        transformMethod { node ->
+        transformClass { classNode: ClassNode ->
             mappings.run {
-                node.desc = mapMethodDesc(node.desc, direction)
 
-                node.exceptions = node.exceptions.map { mapType(it, direction) }
 
-                node.localVariables.forEach {
-                    it.desc = mapType(it.desc, direction)
-                }
+                classNode.methods.forEach { methodNode ->
+                    // Mapping other references
+                    methodNode.desc = mapMethodDesc(methodNode.desc, direction)
 
-                node.tryCatchBlocks.forEach {
-                    it.type = mapClassName(it.type, direction)
-                }
+                    methodNode.exceptions = methodNode.exceptions.map { mapType(it, direction) }
 
-                // AbstractInsnNode
-                node.instructions.forEach {
-                    when (it) {
-                        is FieldInsnNode -> {
-                            val mapClassName = mapClassName(it.owner, direction)
-                            it.name = run {
-                                val mappedClass = getMappedClass(it.owner, direction)
-                                    ?.fields
-                                    ?.get(
-                                        FieldIdentifier(
-                                            it.name,
-                                            direction.asOppositeType()
-                                        )
-                                    )
+                    methodNode.localVariables.forEach {
+                        it.desc = mapType(it.desc, direction)
+                    }
 
-                                when (direction) {
-                                    MappingDirection.TO_REAL -> mappedClass?.realIdentifier
-                                    MappingDirection.TO_FAKE -> mappedClass?.fakeIdentifier
-                                }?.name ?: it.name
+                    methodNode.tryCatchBlocks.forEach {
+                        it.type = mapClassName(it.type, direction) ?: it.type
+                    }
+
+                    // AbstractInsnNode
+                    methodNode.instructions.forEach { insnNode ->
+                        when (insnNode) {
+                            is FieldInsnNode -> {
+                                insnNode.name = mapFieldName(insnNode.owner, insnNode.name, direction) ?: insnNode.name
+                                insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
+                                insnNode.desc = mapType(insnNode.desc, direction)
                             }
-                            it.owner = mapClassName
-                            it.desc = mapType(it.desc, direction)
-                        }
 
-                        is InvokeDynamicInsnNode -> {
-                            // Can ignore name because only the name of the bootstrap method is known at compile time and that is held in the handle field
-                            it.desc =
-                                mapMethodDesc(it.desc, direction) // Expected descriptor type of the generated call site
+                            is InvokeDynamicInsnNode -> {
+                                // Can ignore name because only the name of the bootstrap method is known at compile time and that is held in the handle field
+                                insnNode.desc =
+                                    mapMethodDesc(
+                                        insnNode.desc,
+                                        direction
+                                    ) // Expected descriptor type of the generated call site
 
-                            val desc = mapMethodDesc(it.bsm.desc, direction)
-                            it.bsm = Handle(
-                                it.bsm.tag,
-                                mapType(it.bsm.owner, direction),
-                                mapMethodName(it.bsm.owner, it.bsm.name, desc, direction),
-                                desc,
-                                it.bsm.isInterface
-                            )
-                        }
+                                val desc = mapMethodDesc(insnNode.bsm.desc, direction)
+                                insnNode.bsm = Handle(
+                                    insnNode.bsm.tag,
+                                    mapType(insnNode.bsm.owner, direction),
+                                    mapMethodName(insnNode.bsm.owner, insnNode.bsm.name, desc, direction)
+                                        ?: insnNode.bsm.name,
+                                    desc,
+                                    insnNode.bsm.isInterface
+                                )
+                            }
 
-                        is MethodInsnNode -> {
-                            val mapDesc = mapMethodDesc(it.desc, direction)
+                            is MethodInsnNode -> {
+                                val mapDesc = mapMethodDesc(insnNode.desc, direction)
 
-                            it.name = mapMethodName(it.owner, it.name, mapDesc, direction)
-                            it.owner = mapClassName(it.owner, direction)
-                            it.desc = mapDesc
-                        }
+                                insnNode.name = mapMethodName(insnNode.owner, insnNode.name, mapDesc, direction)
+                                    ?: (classNode.interfaces + classNode.superName)?.firstNotNullOfOrNull {
+                                        mapMethodName(
+                                            it,
+                                            insnNode.name,
+                                            mapDesc,
+                                            direction
+                                        )
+                                    } ?: insnNode.name
 
-                        is MultiANewArrayInsnNode -> {
-                            it.desc = mapType(it.desc, direction)
-                        }
+                                insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
+                                insnNode.desc = mapDesc
+                            }
 
-                        is TypeInsnNode -> {
-                            it.desc = mapClassName(it.desc, direction)
+                            is MultiANewArrayInsnNode -> {
+                                insnNode.desc = mapType(insnNode.desc, direction)
+                            }
+
+                            is TypeInsnNode -> {
+                                insnNode.desc = mapClassName(insnNode.desc, direction) ?: insnNode.desc
+                            }
                         }
                     }
                 }
+                classNode.methods.forEach {
+                    it.name = mapMethodName(classNode.name, it.name, it.desc, direction)
+                        ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
+                            mapMethodName(n, it.name, it.desc, direction)
+                        } ?: it.name
+                }
+
+                classNode.fields.forEach {
+                    it.name = mapFieldName(classNode.name, it.name, direction) ?: it.name
+                }
+
+                classNode.name = mapClassName(classNode.name, direction) ?: classNode.name
+
+                classNode.interfaces = classNode.interfaces.map { mapClassName(it, direction) ?: it }
+
             }
+
+
+            classNode
+        }
+
+        transformMethod { node ->
+
 
             node
         }

@@ -26,7 +26,7 @@ allprojects {
         mavenCentral()
         maven {
             isAllowInsecureProtocol = true
-            url = uri("http://repo.yakclient.net/snapshots")
+            url = uri("http://maven.yakclient.net/snapshots")
         }
     }
 
