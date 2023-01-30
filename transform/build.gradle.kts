@@ -5,11 +5,16 @@ version = "1.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
+
 }
 
 dependencies {
     implementation(project(":"))
-    implementation("net.yakclient:archives:1.0-SNAPSHOT")
+    implementation("net.yakclient:archives:1.1-SNAPSHOT") {
+        isChanging = true
+    }
+    implementation("net.yakclient:common-util:1.0-SNAPSHOT")
+
 }
 
 task<Jar>("sourcesJar") {

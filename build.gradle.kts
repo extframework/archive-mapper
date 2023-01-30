@@ -30,6 +30,10 @@ allprojects {
         }
     }
 
+    configurations.all {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+
     kotlin {
         explicitApi()
     }

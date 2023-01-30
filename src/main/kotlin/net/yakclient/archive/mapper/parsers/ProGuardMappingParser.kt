@@ -6,7 +6,6 @@ import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
-import kotlin.properties.Delegates
 
 private const val CLASS_REGEX = """^(\S+) -> (\S+):$"""
 private const val METHOD_REGEX =
@@ -63,9 +62,10 @@ public object ProGuardMappingParser : MappingParser {
 
             // Read the first line
             var line: String = reader.readLine().trim()
+            var oneMore = true // To make sure we get the last line
 
             // Start reading lines
-            while (reader.ready()) {
+            while (reader.ready() || oneMore.also { oneMore = false }) {
                 // Match for a class
                 val gv = classMatcher.matchEntire(line)?.groupValues
 
@@ -86,7 +86,7 @@ public object ProGuardMappingParser : MappingParser {
                 val fields = ArrayList<FieldMapping>()
 
                 // Start reading lines
-                while (reader.ready()) {
+                innerreader@ while (reader.ready()) {
                     // Update the line
                     line = reader.readLine().trim() // Read a new line
 
@@ -95,7 +95,6 @@ public object ProGuardMappingParser : MappingParser {
 
                         if (type !is ClassTypeIdentifier) return type
                         val fullQualifier = typeMappings[type.fullQualifier]
-
 
                         return if (fullQualifier != null) ClassTypeIdentifier(
                             fullQualifier
@@ -152,7 +151,7 @@ public object ProGuardMappingParser : MappingParser {
                                 ),
                                 FieldIdentifier(
                                     result[3],
-                                    MappingType.REAL
+                                    MappingType.FAKE
                                 ), // Fake name
                                 realType, // Type
                                 fakeIdentifier(realType)
@@ -161,10 +160,10 @@ public object ProGuardMappingParser : MappingParser {
                     }
                     // Else, if the current line is source file attribute
                     else if (line.startsWith("#")) {
-                        continue
+                        continue@innerreader
                     }
                     // If its not a field or method, then the class definition is over, and we can break.
-                    else break
+                    else break@innerreader
                 }
 
                 // Method and field reading is done, create a mapped class and add it to the classes list.
