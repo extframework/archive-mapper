@@ -1,11 +1,5 @@
-
-
-group = "net.yakclient"
-version = "1.1-SNAPSHOT"
-
 repositories {
     mavenCentral()
-
 }
 
 dependencies {
@@ -14,7 +8,6 @@ dependencies {
         isChanging = true
     }
     implementation("net.yakclient:common-util:1.0-SNAPSHOT")
-
 }
 
 task<Jar>("sourcesJar") {
@@ -71,4 +64,3 @@ publishing {
         }
     }
 }
-

@@ -6,9 +6,6 @@ plugins {
     id("org.jetbrains.dokka") version "1.6.21"
 }
 
-group = "net.yakclient"
-version = "1.1-SNAPSHOT"
-
 tasks.wrapper {
     gradleVersion = "7.2"
 }
@@ -21,6 +18,9 @@ allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "maven-publish")
     apply(plugin = "org.jetbrains.dokka")
+
+    group = "net.yakclient"
+    version = "1.1-SNAPSHOT"
 
     repositories {
         mavenCentral()
@@ -46,7 +46,6 @@ allprojects {
 
     tasks.compileKotlin {
         destinationDirectory.set(tasks.compileJava.get().destinationDirectory.asFile.get())
-
 
         kotlinOptions {
             jvmTarget = "17"
@@ -77,6 +76,7 @@ allprojects {
                 isAllowInsecureProtocol = true
 
                 url = uri("http://maven.yakclient.net/$repo")
+                println(url)
 
                 credentials {
                     username = project.findProperty("maven-user") as String
