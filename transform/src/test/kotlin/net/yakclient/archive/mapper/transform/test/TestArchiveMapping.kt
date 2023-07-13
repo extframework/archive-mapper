@@ -17,8 +17,8 @@ import java.util.jar.JarOutputStream
 class TestArchiveMapping {
     @Test
     fun `Map Archive`() {
-        val resourceIn = this::class.java.getResource("/minecraft-1.18.jar")
-        val mappingsIn = this::class.java.getResourceAsStream("/minecraft-mappings-1.18.txt")
+        val resourceIn = this::class.java.getResource("/minecraft-1.19.2.jar")!!
+        val mappingsIn = this::class.java.getResourceAsStream("/minecraft-mappings-1.19.2.txt")!!
 
         val path = Path.of(resourceIn.file)
         val archive = Archives.find(path, Archives.Finders.ZIP_FINDER)
@@ -27,8 +27,7 @@ class TestArchiveMapping {
             return listFiles()?.flatMap { if (it.extension == "jar") listOf(it.toPath()) else it.childPaths() } ?: listOf()
         }
 
-        val childPaths = Path.of(this::class.java.getResource("/minecraft-1.18.jar").file).parent.resolve("lib").toFile().childPaths()
-        println(childPaths)
+        val childPaths = path.parent.resolve("lib").toFile().childPaths()
         transformArchive(
             archive,
             childPaths.map { Archives.find(it, Archives.Finders.ZIP_FINDER) },
@@ -58,7 +57,7 @@ class TestArchiveMapping {
                 target.closeEntry()
             }
         }
-        val resolve = Path.of(resourceIn.path).parent.resolve("out.jar")
+        val resolve = Files.createTempFile("out", ".jar")
         println(resolve)
 
         Files.copy(createTempFile, resolve, StandardCopyOption.REPLACE_EXISTING)

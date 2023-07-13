@@ -7,6 +7,8 @@ import net.yakclient.archive.mapper.transform.MappingDirection.TO_REAL
 import net.yakclient.archives.extension.parameters
 import net.yakclient.archives.transform.ByteCodeUtils
 import net.yakclient.archives.transform.MethodSignature
+import org.objectweb.asm.signature.SignatureReader
+import org.objectweb.asm.signature.SignatureWriter
 
 public fun ArchiveMapping.getMappedClass(jvmName: String, direction: MappingDirection): ClassMapping? {
     return classes[ClassIdentifier(
@@ -53,11 +55,20 @@ public fun ArchiveMapping.mapMethodDesc(desc: String, direction: MappingDirectio
     )
 }
 
-public fun ArchiveMapping.mapMethodSignature(cls: String, signature: String, direction: MappingDirection): String {
-    val (name, desc, returnType) = MethodSignature.of(signature)
-    checkNotNull(returnType) { "Cannot map a method signature with a non-existent return type. Signature was '$signature'" }
-    val mappedDesc = mapMethodDesc("($desc)$returnType", direction)
-    return (mapMethodName(cls, name, signature, direction) ?: name) + mappedDesc
+public fun ArchiveMapping.mapAnySignature(signature: String, direction: MappingDirection): String {
+    val visitor = object : SignatureWriter() {
+        override fun visitClassType(name: String?) {
+            super.visitClassType(name?.let { mapClassName(it, direction) } ?: name)
+        }
+
+        override fun visitInnerClassType(name: String?) {
+            super.visitInnerClassType(name?.let { mapClassName(it, direction) } ?: name)
+        }
+    }
+    val reader = SignatureReader(signature)
+
+    reader.accept(visitor)
+    return visitor.toString()
 }
 
 // Maps a JVM type to a TypeIdentifier
@@ -102,7 +113,7 @@ public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String,
     }?.name
 }
 
-public fun ArchiveMapping.mapFieldName(owner: String, name: String, direction: MappingDirection) : String? {
+public fun ArchiveMapping.mapFieldName(owner: String, name: String, direction: MappingDirection): String? {
     val mappedClass = getMappedClass(owner, direction)
         ?.fields
         ?.get(
@@ -118,7 +129,7 @@ public fun ArchiveMapping.mapFieldName(owner: String, name: String, direction: M
     }?.name
 }
 
-internal fun MappingDirection.asOppositeType() : MappingType = when (this) {
+internal fun MappingDirection.asOppositeType(): MappingType = when (this) {
     TO_REAL -> MappingType.FAKE
     TO_FAKE -> MappingType.REAL
 }

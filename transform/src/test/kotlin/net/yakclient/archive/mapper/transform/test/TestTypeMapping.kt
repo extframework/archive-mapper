@@ -7,7 +7,6 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.*
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
-import java.net.URI
 import java.net.URL
 import kotlin.test.Test
 
@@ -35,11 +34,29 @@ class TestTypeMapping {
         val parser = net.yakclient.archive.mapper.parsers.ProGuardMappingParser
 
         val mappings =
-            parser.parse(URI("https://launcher.mojang.com/v1/objects/a661c6a55a0600bd391bdbbd6827654c05b2109c/client.txt").toURL().openStream())
+            parser.parse(this::class.java.getResourceAsStream("/minecraft-mappings-1.19.2.txt")!!)
 
-        printAndCheck(mappings.mapMethodSignature("net/minecraft/client/gui/screens/TitleScreen", "init()V", MappingDirection.TO_FAKE), "b()V")
+        printAndCheck(mappings.mapAnySignature("([Ldwi\$a;IILdwi\$a<IILdvx;>;)Ljava/util/List<Ldwl;>;", MappingDirection.TO_REAL), "([Lnet/minecraft/world/level/timers/TimerQueue\$Event;IILnet/minecraft/world/level/timers/TimerQueue\$Event<IILnet/minecraft/world/level/storage/loot/providers/score/ContextScoreboardNameProvider;>;)Ljava/util/List<Lnet/minecraft/world/phys/AABB;>;")
     }
 
+    @Test
+    fun `Test type with generic regex`() {
+        val typeWithGenericRegex = Regex("^(.+?)(?:<(.+?)>)?;$")
+
+        fun testStr(str: String, vararg with: String) {
+            val match = typeWithGenericRegex.matchEntire(str)
+            checkNotNull(match)
+            println(match.groupValues)
+            check(match.groupValues.containsAll(listOf(*with)))
+        }
+
+
+        testStr("Lasdfasdfasdf<asdfasdf;>;", "asdfasdfasdf","asdfasdf;")
+        testStr("Lasdfasdf;", "asdfasdf")
+        testStr("[Lasdfasdf;", "asdfasdf")
+        testStr("[[[[Laaaa<asdf>;", "aaaa", "asdf")
+
+    }
 
     @Test
     fun `Test full class type map`() {

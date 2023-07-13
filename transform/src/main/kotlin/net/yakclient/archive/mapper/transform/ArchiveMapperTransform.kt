@@ -25,11 +25,21 @@ public fun mappingTransformConfigFor(
                 classNode.fields.forEach { fieldNode ->
                     fieldNode.desc = mapType(fieldNode.desc, direction)
                     fieldNode.name = mapFieldName(classNode.name, fieldNode.name, direction) ?: fieldNode.name
+                    if (fieldNode.signature != null)
+                        fieldNode.signature = mapAnySignature(fieldNode.signature, direction)
                 }
 
                 classNode.methods.forEach { methodNode ->
                     // Mapping other references
+                    methodNode.name = mapMethodName(classNode.name, methodNode.name, methodNode.desc, direction)
+                        ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
+                            mapMethodName(n, methodNode.name, methodNode.desc, direction)
+                        } ?: methodNode.name
+
                     methodNode.desc = mapMethodDesc(methodNode.desc, direction)
+
+                    if (methodNode.signature != null)
+                        methodNode.signature = mapAnySignature(methodNode.signature, direction)
 
                     methodNode.exceptions = methodNode.exceptions.map { mapType(it, direction) }
 
@@ -51,40 +61,37 @@ public fun mappingTransformConfigFor(
                             }
 
                             is InvokeDynamicInsnNode -> {
+                                insnNode.bsm = Handle(
+                                    insnNode.bsm.tag,
+                                    mapType(insnNode.bsm.owner, direction),
+                                    mapMethodName(insnNode.bsm.owner, insnNode.bsm.name, insnNode.bsm.desc, direction)
+                                        ?: insnNode.bsm.name,
+                                    mapMethodDesc(insnNode.bsm.desc, direction),
+                                    insnNode.bsm.isInterface
+                                )
+
                                 // Can ignore name because only the name of the bootstrap method is known at compile time and that is held in the handle field
                                 insnNode.desc =
                                     mapMethodDesc(
                                         insnNode.desc,
                                         direction
                                     ) // Expected descriptor type of the generated call site
-
-                                val desc = mapMethodDesc(insnNode.bsm.desc, direction)
-                                insnNode.bsm = Handle(
-                                    insnNode.bsm.tag,
-                                    mapType(insnNode.bsm.owner, direction),
-                                    mapMethodName(insnNode.bsm.owner, insnNode.bsm.name, desc, direction)
-                                        ?: insnNode.bsm.name,
-                                    desc,
-                                    insnNode.bsm.isInterface
-                                )
                             }
 
                             is MethodInsnNode -> {
-                                val mapDesc = mapMethodDesc(insnNode.desc, direction)
-
-                                insnNode.name = mapMethodName(insnNode.owner, insnNode.name, mapDesc, direction)
+                                insnNode.name = mapMethodName(insnNode.owner, insnNode.name, insnNode.desc, direction)
                                     ?: (classNode.interfaces + classNode.superName)
                                         .firstNotNullOfOrNull {
                                             mapMethodName(
                                                 it,
                                                 insnNode.name,
-                                                mapDesc,
+                                                insnNode.desc,
                                                 direction
                                             )
                                         } ?: insnNode.name
 
                                 insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
-                                insnNode.desc = mapDesc
+                                insnNode.desc = mapMethodDesc(insnNode.desc, direction)
                             }
 
                             is MultiANewArrayInsnNode -> {
@@ -97,14 +104,10 @@ public fun mappingTransformConfigFor(
                         }
                     }
                 }
-                classNode.methods.forEach {
-                    it.name = mapMethodName(classNode.name, it.name, it.desc, direction)
-                        ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
-                            mapMethodName(n, it.name, it.desc, direction)
-                        } ?: it.name
-                }
-
                 classNode.name = mapClassName(classNode.name, direction) ?: classNode.name
+
+                if (classNode.signature != null)
+                    classNode.signature = mapAnySignature(classNode.signature, direction)
 
                 classNode.interfaces = classNode.interfaces.map { mapClassName(it, direction) ?: it }
 
@@ -113,7 +116,6 @@ public fun mappingTransformConfigFor(
         }
     }
 }
-
 
 
 public fun transformClass(
@@ -137,7 +139,7 @@ private data class ATContext(
     val config: TransformerConfig,
     val direction: MappingDirection
 ) {
-    fun make() : ClassWriter = MappingAwareClassWriter(
+    fun make(): ClassWriter = MappingAwareClassWriter(
         this
     )
 }
@@ -207,7 +209,7 @@ private class MappingAwareClassWriter(
     Archives.WRITER_FLAGS,
 ) {
 
-    private fun getMappedNode(name: String) : HierarchyNode? {
+    private fun getMappedNode(name: String): HierarchyNode? {
         val node = context.theArchive.reader["$name.class"]?.let {
             val entryInput = it.resource.open()
             val reader = ClassReader(entryInput)
