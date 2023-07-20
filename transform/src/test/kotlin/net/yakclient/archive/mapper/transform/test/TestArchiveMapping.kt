@@ -17,8 +17,8 @@ import java.util.jar.JarOutputStream
 class TestArchiveMapping {
     @Test
     fun `Map Archive`() {
-        val resourceIn = this::class.java.getResource("/minecraft-1.19.2.jar")!!
-        val mappingsIn = this::class.java.getResourceAsStream("/minecraft-mappings-1.19.2.txt")!!
+        val resourceIn = this::class.java.getResource("/minecraft-1.20.1.jar")!!
+        val mappingsIn = this::class.java.getResourceAsStream("/minecraft-mappings-1.20.1.txt")!!
 
         val path = Path.of(resourceIn.file)
         val archive = Archives.find(path, Archives.Finders.ZIP_FINDER)

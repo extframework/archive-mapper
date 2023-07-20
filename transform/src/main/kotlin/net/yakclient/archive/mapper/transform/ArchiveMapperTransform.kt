@@ -10,15 +10,19 @@ import net.yakclient.common.util.resource.ProvidedResource
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Handle
+import org.objectweb.asm.Type
 import org.objectweb.asm.tree.*
 import java.io.InputStream
 
 public fun mappingTransformConfigFor(
     mappings: ArchiveMapping,
-    direction: MappingDirection
+    direction: MappingDirection,
+    tree: ClassInheritanceTree
 ): TransformerConfig.Mutable {
+    fun ClassInheritancePath.toCheck(): List<String> {
+        return listOf(name) + interfaces.flatMap { it.toCheck() } + (superClass?.toCheck() ?: listOf())
+    }
 
-    // TODO this method is not perfect, it just needs a bit of fine tuning but then it could be really good.
     return TransformerConfig.of {
         transformClass { classNode: ClassNode ->
             mappings.run {
@@ -55,20 +59,38 @@ public fun mappingTransformConfigFor(
                     methodNode.instructions.forEach { insnNode ->
                         when (insnNode) {
                             is FieldInsnNode -> {
-                                insnNode.name = mapFieldName(insnNode.owner, insnNode.name, direction) ?: insnNode.name
+                                insnNode.name = tree[insnNode.owner]?.toCheck()?.firstNotNullOfOrNull {
+                                    mapFieldName(
+                                        it,
+                                        insnNode.name,
+                                        direction
+                                    )
+                                } ?: insnNode.name
+
                                 insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
                                 insnNode.desc = mapType(insnNode.desc, direction)
                             }
 
                             is InvokeDynamicInsnNode -> {
-                                insnNode.bsm = Handle(
-                                    insnNode.bsm.tag,
-                                    mapType(insnNode.bsm.owner, direction),
-                                    mapMethodName(insnNode.bsm.owner, insnNode.bsm.name, insnNode.bsm.desc, direction)
-                                        ?: insnNode.bsm.name,
-                                    mapMethodDesc(insnNode.bsm.desc, direction),
-                                    insnNode.bsm.isInterface
+                                fun Handle.mapHandle() : Handle = Handle(
+                                    tag,
+                                    mapType(owner, direction),
+                                    tree[owner]?.toCheck()?.firstNotNullOfOrNull {
+                                        mapMethodName(
+                                            it,
+                                            name,
+                                            desc,
+                                            direction
+                                        )
+                                    } ?: name,
+                                    mapMethodDesc(desc, direction),
+                                    isInterface
                                 )
+
+                                // Type and Handle
+                                insnNode.bsm = insnNode.bsm.mapHandle()
+
+                                // TODO map bsm args
 
                                 // Can ignore name because only the name of the bootstrap method is known at compile time and that is held in the handle field
                                 insnNode.desc =
@@ -79,16 +101,14 @@ public fun mappingTransformConfigFor(
                             }
 
                             is MethodInsnNode -> {
-                                insnNode.name = mapMethodName(insnNode.owner, insnNode.name, insnNode.desc, direction)
-                                    ?: (classNode.interfaces + classNode.superName)
-                                        .firstNotNullOfOrNull {
-                                            mapMethodName(
-                                                it,
-                                                insnNode.name,
-                                                insnNode.desc,
-                                                direction
-                                            )
-                                        } ?: insnNode.name
+                                insnNode.name = tree[insnNode.owner]?.toCheck()?.firstNotNullOfOrNull {
+                                    mapMethodName(
+                                        it,
+                                        insnNode.name,
+                                        insnNode.desc,
+                                        direction
+                                    )
+                                } ?: insnNode.name
 
                                 insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
                                 insnNode.desc = mapMethodDesc(insnNode.desc, direction)
@@ -111,25 +131,21 @@ public fun mappingTransformConfigFor(
 
                 classNode.interfaces = classNode.interfaces.map { mapClassName(it, direction) ?: it }
 
+                classNode.outerClass = if (classNode.outerClass != null) mapClassName(classNode.outerClass, direction)
+                    ?: classNode.outerClass else null
+
                 classNode.superName = mapClassName(classNode.superName, direction) ?: classNode.superName
+
+                classNode.innerClasses.forEach {
+                    it.outerName = classNode.name
+                    it.name = mapClassName(it.name, direction) ?: it.name
+                    it.innerName = if (it.innerName != null) it.name.substringAfter("\$") else null
+                }
             }
         }
     }
 }
 
-
-public fun transformClass(
-    reader: ClassReader,
-    mappings: ArchiveMapping,
-    direction: MappingDirection,
-    writer: ClassWriter = ClassWriter(Archives.WRITER_FLAGS)
-): ByteArray {
-    return Archives.resolve(
-        reader,
-        mappingTransformConfigFor(mappings, direction),
-        writer
-    )
-}
 
 // Archive transforming context
 private data class ATContext(
@@ -161,7 +177,6 @@ private fun ArchiveReference.transformAndWriteClass(
     val entry = checkNotNull(
         reader["$name.class"]
     ) { "Failed to find class '$name' when transforming archive: '${this.name}'" }
-
 
     val resolve = Archives.resolve(
         ClassReader(entry.resource.open()),
@@ -208,7 +223,6 @@ private class MappingAwareClassWriter(
     context.dependencies,
     Archives.WRITER_FLAGS,
 ) {
-
     private fun getMappedNode(name: String): HierarchyNode? {
         val node = context.theArchive.reader["$name.class"]?.let {
             val entryInput = it.resource.open()
@@ -241,6 +255,37 @@ private class MappingAwareClassWriter(
     }
 }
 
+public typealias ClassInheritanceTree = Map<String, ClassInheritancePath>
+
+public data class ClassInheritancePath(
+    val name: String,
+    val superClass: ClassInheritancePath?,
+    val interfaces: List<ClassInheritancePath>
+)
+
+public fun createFakeInheritancePath(entry: ArchiveReference.Entry): ClassInheritancePath {
+    val reader = ClassReader(entry.resource.open())
+    val node = ClassNode()
+    reader.accept(node, 0)
+
+    return ClassInheritancePath(
+        node.name,
+
+        entry.handle.reader[node.superName + ".class"]?.let(::createFakeInheritancePath),
+        node.interfaces?.mapNotNull {
+            entry.handle.reader["$it.class"]?.let(::createFakeInheritancePath)
+        } ?: listOf()
+    )
+}
+
+public fun createFakeInheritanceTree(archive: ArchiveReference): ClassInheritanceTree {
+    return archive.reader.entries()
+        .filterNot(ArchiveReference.Entry::isDirectory)
+        .filter { it.name.endsWith(".class") }
+        .map(::createFakeInheritancePath)
+        .associateBy { it.name }
+}
+
 
 public fun transformArchive(
     archive: ArchiveReference,
@@ -248,7 +293,9 @@ public fun transformArchive(
     mappings: ArchiveMapping,
     direction: MappingDirection,
 ) {
-    val config = mappingTransformConfigFor(mappings, direction)
+    val inheritanceTree: ClassInheritanceTree = createFakeInheritanceTree(archive)
+
+    val config = mappingTransformConfigFor(mappings, direction, inheritanceTree)
 
     val context = ATContext(archive, dependencies, mappings, config, direction)
 
@@ -257,7 +304,6 @@ public fun transformArchive(
         .forEach { e ->
             if ((mappings.mapClassName(e.name, MappingDirection.TO_REAL)?.removeSuffix(".class")
                     ?.let { archive.reader.contains(it) } != true)
-            )
-                archive.transformAndWriteClass(e.name.removeSuffix(".class"), context)
+            ) archive.transformAndWriteClass(e.name.removeSuffix(".class"), context)
         }
 }

@@ -3,7 +3,9 @@ package net.yakclient.archive.mapper.transform.test
 import net.yakclient.archive.mapper.*
 import net.yakclient.archive.mapper.MappingType.*
 import net.yakclient.archive.mapper.transform.*
+import net.yakclient.archives.Archives
 import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.tree.*
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
@@ -25,8 +27,14 @@ class TestTypeMapping {
 
         printAndCheck(mappings.mapType("C", MappingDirection.TO_FAKE), "C")
         printAndCheck(mappings.mapType("Ljava/lang/String;", MappingDirection.TO_FAKE), "Ljava/lang/String;")
-        printAndCheck(mappings.mapType("Lcom/mojang/blaze3d/platform/InputConstants;", MappingDirection.TO_FAKE), "Ldsh;")
-        printAndCheck(mappings.mapType("[[[Lcom/mojang/blaze3d/platform/InputConstants;", MappingDirection.TO_FAKE), "[[[Ldsh;")
+        printAndCheck(
+            mappings.mapType("Lcom/mojang/blaze3d/platform/InputConstants;", MappingDirection.TO_FAKE),
+            "Ldsh;"
+        )
+        printAndCheck(
+            mappings.mapType("[[[Lcom/mojang/blaze3d/platform/InputConstants;", MappingDirection.TO_FAKE),
+            "[[[Ldsh;"
+        )
     }
 
     @Test
@@ -36,7 +44,13 @@ class TestTypeMapping {
         val mappings =
             parser.parse(this::class.java.getResourceAsStream("/minecraft-mappings-1.19.2.txt")!!)
 
-        printAndCheck(mappings.mapAnySignature("([Ldwi\$a;IILdwi\$a<IILdvx;>;)Ljava/util/List<Ldwl;>;", MappingDirection.TO_REAL), "([Lnet/minecraft/world/level/timers/TimerQueue\$Event;IILnet/minecraft/world/level/timers/TimerQueue\$Event<IILnet/minecraft/world/level/storage/loot/providers/score/ContextScoreboardNameProvider;>;)Ljava/util/List<Lnet/minecraft/world/phys/AABB;>;")
+        printAndCheck(
+            mappings.mapAnySignature(
+                "([Ldwi\$a;IILdwi\$a<IILdvx;>;)Ljava/util/List<Ldwl;>;",
+                MappingDirection.TO_REAL
+            ),
+            "([Lnet/minecraft/world/level/timers/TimerQueue\$Event;IILnet/minecraft/world/level/timers/TimerQueue\$Event<IILnet/minecraft/world/level/storage/loot/providers/score/ContextScoreboardNameProvider;>;)Ljava/util/List<Lnet/minecraft/world/phys/AABB;>;"
+        )
     }
 
     @Test
@@ -51,11 +65,30 @@ class TestTypeMapping {
         }
 
 
-        testStr("Lasdfasdfasdf<asdfasdf;>;", "asdfasdfasdf","asdfasdf;")
+        testStr("Lasdfasdfasdf<asdfasdf;>;", "asdfasdfasdf", "asdfasdf;")
         testStr("Lasdfasdf;", "asdfasdf")
         testStr("[Lasdfasdf;", "asdfasdf")
         testStr("[[[[Laaaa<asdf>;", "aaaa", "asdf")
 
+    }
+
+    public fun transformClass(
+        reader: ClassReader,
+        mappings: ArchiveMapping,
+        direction: MappingDirection,
+        writer: ClassWriter = ClassWriter(Archives.WRITER_FLAGS)
+    ): ByteArray {
+        return Archives.resolve(
+            reader,
+            mappingTransformConfigFor(mappings, direction,
+                listOf(
+                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeClass", null, listOf()),
+                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeException", null, listOf()),
+                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeSuperType", null, listOf()),
+                ).associateBy { it.name }
+            ),
+            writer
+        )
     }
 
     @Test
@@ -131,7 +164,7 @@ class TestTypeMapping {
             ),
             MethodIdentifier(
                 "getFakeName", listOf(), FAKE
-            ),null,null,null,null,
+            ), null, null, null, null,
             PrimitiveTypeIdentifier.VOID,
             PrimitiveTypeIdentifier.VOID
         )
