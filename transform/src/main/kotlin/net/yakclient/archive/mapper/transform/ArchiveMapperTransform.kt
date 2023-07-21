@@ -72,7 +72,7 @@ public fun mappingTransformConfigFor(
                             }
 
                             is InvokeDynamicInsnNode -> {
-                                fun Handle.mapHandle() : Handle = Handle(
+                                fun Handle.mapHandle(): Handle = Handle(
                                     tag,
                                     mapType(owner, direction),
                                     tree[owner]?.toCheck()?.firstNotNullOfOrNull {
@@ -136,10 +136,18 @@ public fun mappingTransformConfigFor(
 
                 classNode.superName = mapClassName(classNode.superName, direction) ?: classNode.superName
 
-                classNode.innerClasses.forEach {
-                    it.outerName = classNode.name
-                    it.name = mapClassName(it.name, direction) ?: it.name
-                    it.innerName = if (it.innerName != null) it.name.substringAfter("\$") else null
+                classNode.nestHostClass =
+                    if (classNode.nestHostClass != null) mapClassName(classNode.nestHostClass, direction)
+                        ?: classNode.nestHostClass else null
+
+                classNode.nestMembers = classNode.nestMembers?.map {
+                    mapClassName(it, direction) ?: it
+                } ?: ArrayList()
+
+                classNode.innerClasses.forEach { n ->
+                    n.outerName = if (n.outerName != null) mapClassName(n.outerName, direction) ?: n.outerName else n.outerName
+                    n.name = mapClassName(n.name, direction) ?: n.name
+                    n.innerName = if (n.innerName != null) n.name.substringAfter("\$") else null
                 }
             }
         }
