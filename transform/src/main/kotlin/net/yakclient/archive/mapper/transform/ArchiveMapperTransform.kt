@@ -10,7 +10,6 @@ import net.yakclient.common.util.resource.ProvidedResource
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Handle
-import org.objectweb.asm.Type
 import org.objectweb.asm.tree.*
 import java.io.InputStream
 
@@ -145,7 +144,8 @@ public fun mappingTransformConfigFor(
                 } ?: ArrayList()
 
                 classNode.innerClasses.forEach { n ->
-                    n.outerName = if (n.outerName != null) mapClassName(n.outerName, direction) ?: n.outerName else n.outerName
+                    n.outerName =
+                        if (n.outerName != null) mapClassName(n.outerName, direction) ?: n.outerName else n.outerName
                     n.name = mapClassName(n.name, direction) ?: n.name
                     n.innerName = if (n.innerName != null) n.name.substringAfter("\$") else null
                 }
@@ -271,26 +271,45 @@ public data class ClassInheritancePath(
     val interfaces: List<ClassInheritancePath>
 )
 
-public fun createFakeInheritancePath(entry: ArchiveReference.Entry): ClassInheritancePath {
-    val reader = ClassReader(entry.resource.open())
+public fun createFakeInheritancePath(
+    entry: ArchiveReference.Entry,
+    reader: ArchiveReference.Reader
+): ClassInheritancePath {
+    val classReader = ClassReader(entry.resource.open())
     val node = ClassNode()
-    reader.accept(node, 0)
+    classReader.accept(node, 0)
 
     return ClassInheritancePath(
         node.name,
 
-        entry.handle.reader[node.superName + ".class"]?.let(::createFakeInheritancePath),
-        node.interfaces?.mapNotNull {
-            entry.handle.reader["$it.class"]?.let(::createFakeInheritancePath)
+        reader[node.superName + ".class"]?.let { createFakeInheritancePath(it, reader) },
+        node.interfaces?.mapNotNull { n ->
+            reader["$n.class"]?.let { createFakeInheritancePath(it, reader) }
         } ?: listOf()
     )
 }
 
-public fun createFakeInheritanceTree(archive: ArchiveReference): ClassInheritanceTree {
-    return archive.reader.entries()
+public class DelegatingArchiveReader(
+    private val archives: List<ArchiveReference>
+) : ArchiveReference.Reader {
+    override fun entries(): Sequence<ArchiveReference.Entry> = sequence {
+        archives.forEach {
+            yieldAll(it.reader.entries())
+        }
+    }
+
+    override fun of(name: String): ArchiveReference.Entry? {
+        return archives.firstNotNullOfOrNull {
+            it.reader.of(name)
+        }
+    }
+}
+
+public fun createFakeInheritanceTree(reader: ArchiveReference.Reader): ClassInheritanceTree {
+    return reader.entries()
         .filterNot(ArchiveReference.Entry::isDirectory)
         .filter { it.name.endsWith(".class") }
-        .map(::createFakeInheritancePath)
+        .map { createFakeInheritancePath(it, reader) }
         .associateBy { it.name }
 }
 
@@ -301,7 +320,7 @@ public fun transformArchive(
     mappings: ArchiveMapping,
     direction: MappingDirection,
 ) {
-    val inheritanceTree: ClassInheritanceTree = createFakeInheritanceTree(archive)
+    val inheritanceTree: ClassInheritanceTree = createFakeInheritanceTree(archive.reader)
 
     val config = mappingTransformConfigFor(mappings, direction, inheritanceTree)
 
