@@ -179,9 +179,6 @@ private fun ArchiveReference.transformAndWriteClass(
     name: String, // Fake location
     context: ATContext
 ) {
-    val realName = context.mappings.mapClassName(name, context.direction)
-    if (reader.contains("$realName.class")) return
-
     val entry = checkNotNull(
         reader["$name.class"]
     ) { "Failed to find class '$name' when transforming archive: '${this.name}'" }
@@ -205,7 +202,8 @@ private fun ArchiveReference.transformAndWriteClass(
         this
     )
 
-    writer.remove("$name.class")
+    if (transformedNode.name != name)
+        writer.remove("$name.class")
     writer.put(transformedEntry)
 }
 
@@ -275,9 +273,7 @@ public fun createFakeInheritancePath(
     entry: ArchiveReference.Entry,
     reader: ArchiveReference.Reader
 ): ClassInheritancePath {
-    val classReader = ClassReader(entry.resource.open())
-    val node = ClassNode()
-    classReader.accept(node, 0)
+    val node = entry.resource.open().parseNode
 
     return ClassInheritancePath(
         node.name,
@@ -329,8 +325,6 @@ public fun transformArchive(
     archive.reader.entries()
         .filter { it.name.endsWith(".class") }
         .forEach { e ->
-            if ((mappings.mapClassName(e.name, MappingDirection.TO_REAL)?.removeSuffix(".class")
-                    ?.let { archive.reader.contains(it) } != true)
-            ) archive.transformAndWriteClass(e.name.removeSuffix(".class"), context)
+            archive.transformAndWriteClass(e.name.removeSuffix(".class"), context)
         }
 }
