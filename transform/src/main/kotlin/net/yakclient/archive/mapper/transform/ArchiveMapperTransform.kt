@@ -73,7 +73,7 @@ public fun mappingTransformConfigFor(
                             is InvokeDynamicInsnNode -> {
                                 fun Handle.mapHandle(): Handle = Handle(
                                     tag,
-                                    mapClassName(owner, direction),
+                                        mapClassName(owner, direction) ?: owner,
                                     tree[owner]?.toCheck()?.firstNotNullOfOrNull {
                                         mapMethodName(
                                             it,
