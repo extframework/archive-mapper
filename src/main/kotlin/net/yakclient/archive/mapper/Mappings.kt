@@ -5,6 +5,10 @@ public data class ArchiveMapping(
 ) : MappingNode<ArchiveIdentifier> {
     override val realIdentifier: ArchiveIdentifier = ArchiveIdentifier.Real
     override val fakeIdentifier: ArchiveIdentifier = ArchiveIdentifier.Fake
+
+    override fun toString(): String {
+        return "ArchiveMapping{realIdentifier='$realIdentifier', fakeIdentifier='$fakeIdentifier'}"
+    }
 }
 
 public sealed class ArchiveIdentifier : MappingIdentifier {
@@ -24,7 +28,11 @@ public data class ClassMapping(
     override val fakeIdentifier: ClassIdentifier,
     public val methods: Map<MethodIdentifier, MethodMapping>,
     public val fields: Map<FieldIdentifier, FieldMapping>,
-) : MappingNode<ClassIdentifier>
+) : MappingNode<ClassIdentifier> {
+    override fun toString(): String {
+        return "ClassMapping{realIdentifier='$realIdentifier', fakeIdentifier='$fakeIdentifier'}"
+    }
+}
 
 public data class ClassIdentifier(
     override val name: String, override val type: MappingType
