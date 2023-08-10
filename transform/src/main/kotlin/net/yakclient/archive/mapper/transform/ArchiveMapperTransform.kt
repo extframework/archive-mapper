@@ -6,17 +6,16 @@ import net.yakclient.archives.ArchiveTree
 import net.yakclient.archives.Archives
 import net.yakclient.archives.transform.AwareClassWriter
 import net.yakclient.archives.transform.TransformerConfig
+import net.yakclient.common.util.equalsAny
 import net.yakclient.common.util.resource.ProvidedResource
-import org.objectweb.asm.ClassReader
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.Handle
+import org.objectweb.asm.*
 import org.objectweb.asm.tree.*
 import java.io.InputStream
 
 public fun mappingTransformConfigFor(
-    mappings: ArchiveMapping,
-    direction: MappingDirection,
-    tree: ClassInheritanceTree
+        mappings: ArchiveMapping,
+        direction: MappingDirection,
+        tree: ClassInheritanceTree
 ): TransformerConfig.Mutable {
     fun ClassInheritancePath.toCheck(): List<String> {
         return listOf(name) + interfaces.flatMap { it.toCheck() } + (superClass?.toCheck() ?: listOf())
@@ -35,9 +34,9 @@ public fun mappingTransformConfigFor(
                 classNode.methods.forEach { methodNode ->
                     // Mapping other references
                     methodNode.name = mapMethodName(classNode.name, methodNode.name, methodNode.desc, direction)
-                        ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
-                            mapMethodName(n, methodNode.name, methodNode.desc, direction)
-                        } ?: methodNode.name
+                            ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
+                                mapMethodName(n, methodNode.name, methodNode.desc, direction)
+                            } ?: methodNode.name
 
                     methodNode.desc = mapMethodDesc(methodNode.desc, direction)
 
@@ -60,9 +59,9 @@ public fun mappingTransformConfigFor(
                             is FieldInsnNode -> {
                                 insnNode.name = tree[insnNode.owner]?.toCheck()?.firstNotNullOfOrNull {
                                     mapFieldName(
-                                        it,
-                                        insnNode.name,
-                                        direction
+                                            it,
+                                            insnNode.name,
+                                            direction
                                     )
                                 } ?: insnNode.name
 
@@ -71,41 +70,72 @@ public fun mappingTransformConfigFor(
                             }
 
                             is InvokeDynamicInsnNode -> {
-                                fun Handle.mapHandle(): Handle = Handle(
-                                    tag,
-                                        mapClassName(owner, direction) ?: owner,
-                                    tree[owner]?.toCheck()?.firstNotNullOfOrNull {
-                                        mapMethodName(
-                                            it,
-                                            name,
-                                            desc,
-                                            direction
-                                        )
-                                    } ?: name,
-                                    mapMethodDesc(desc, direction),
-                                    isInterface
-                                )
+                                fun Handle.mapHandle(): Handle {
+                                    return if (
+                                            tag.equalsAny(Opcodes.H_INVOKEVIRTUAL, Opcodes.H_INVOKESTATIC, Opcodes.H_INVOKESPECIAL, Opcodes.H_NEWINVOKESPECIAL, Opcodes.H_INVOKEINTERFACE)
+                                    ) Handle(
+                                            tag,
+                                            mapClassName(owner, direction) ?: owner,
+                                            tree[owner]?.toCheck()?.firstNotNullOfOrNull {
+                                                mapMethodName(
+                                                        it,
+                                                        name,
+                                                        desc,
+                                                        direction
+                                                )
+                                            } ?: name,
+                                            mapMethodDesc(desc, direction),
+                                            isInterface
+                                    ) else if (
+                                            tag.equalsAny(Opcodes.H_GETFIELD, Opcodes.H_GETSTATIC, Opcodes.H_PUTFIELD, Opcodes.H_PUTSTATIC)
+                                    ) Handle(
+                                            tag,
+                                            mapClassName(owner, direction) ?: owner,
+                                            tree[owner]?.toCheck()?.firstNotNullOfOrNull {
+                                                mapFieldName(
+                                                        it,
+                                                        name,
+                                                        direction
+                                                )
+                                            } ?: name,
+                                            mapType(desc, direction),
+                                            isInterface
+                                    ) else throw IllegalArgumentException("Unknown tag type : '$tag' for invoke dynamic instruction : '$insnNode' with handle: '$this'")
+                                }
 
                                 // Type and Handle
                                 insnNode.bsm = insnNode.bsm.mapHandle()
 
-                                // TODO map bsm args
+                                insnNode.bsmArgs = insnNode.bsmArgs.map {
+                                    when (it) {
+                                        is Type -> {
+                                            when (it.sort) {
+                                                Type.ARRAY, Type.OBJECT -> Type.getType(mapType(it.internalName, direction))
+                                                Type.METHOD -> Type.getType(mapMethodDesc(it.internalName, direction))
+                                                else -> it
+                                            }
+                                        }
+
+                                        is Handle -> it.mapHandle()
+                                        else -> it
+                                    }
+                                }.toTypedArray()
 
                                 // Can ignore name because only the name of the bootstrap method is known at compile time and that is held in the handle field
                                 insnNode.desc =
-                                    mapMethodDesc(
-                                        insnNode.desc,
-                                        direction
-                                    ) // Expected descriptor type of the generated call site
+                                        mapMethodDesc(
+                                                insnNode.desc,
+                                                direction
+                                        ) // Expected descriptor type of the generated call site
                             }
 
                             is MethodInsnNode -> {
                                 insnNode.name = tree[insnNode.owner]?.toCheck()?.firstNotNullOfOrNull {
                                     mapMethodName(
-                                        it,
-                                        insnNode.name,
-                                        insnNode.desc,
-                                        direction
+                                            it,
+                                            insnNode.name,
+                                            insnNode.desc,
+                                            direction
                                     )
                                 } ?: insnNode.name
 
@@ -131,13 +161,13 @@ public fun mappingTransformConfigFor(
                 classNode.interfaces = classNode.interfaces.map { mapClassName(it, direction) ?: it }
 
                 classNode.outerClass = if (classNode.outerClass != null) mapClassName(classNode.outerClass, direction)
-                    ?: classNode.outerClass else null
+                        ?: classNode.outerClass else null
 
                 classNode.superName = mapClassName(classNode.superName, direction) ?: classNode.superName
 
                 classNode.nestHostClass =
-                    if (classNode.nestHostClass != null) mapClassName(classNode.nestHostClass, direction)
-                        ?: classNode.nestHostClass else null
+                        if (classNode.nestHostClass != null) mapClassName(classNode.nestHostClass, direction)
+                                ?: classNode.nestHostClass else null
 
                 classNode.nestMembers = classNode.nestMembers?.map {
                     mapClassName(it, direction) ?: it
@@ -145,7 +175,8 @@ public fun mappingTransformConfigFor(
 
                 classNode.innerClasses.forEach { n ->
                     n.outerName =
-                        if (n.outerName != null) mapClassName(n.outerName, direction) ?: n.outerName else n.outerName
+                            if (n.outerName != null) mapClassName(n.outerName, direction)
+                                    ?: n.outerName else n.outerName
                     n.name = mapClassName(n.name, direction) ?: n.name
                     n.innerName = if (n.innerName != null) n.name.substringAfter("\$") else null
                 }
@@ -157,14 +188,14 @@ public fun mappingTransformConfigFor(
 
 // Archive transforming context
 private data class ATContext(
-    val theArchive: ArchiveReference,
-    val dependencies: List<ArchiveTree>,
-    val mappings: ArchiveMapping,
-    val config: TransformerConfig,
-    val direction: MappingDirection
+        val theArchive: ArchiveReference,
+        val dependencies: List<ArchiveTree>,
+        val mappings: ArchiveMapping,
+        val config: TransformerConfig,
+        val direction: MappingDirection
 ) {
     fun make(): ClassWriter = MappingAwareClassWriter(
-        this
+            this
     )
 }
 
@@ -176,17 +207,17 @@ private val InputStream.parseNode: ClassNode
     }
 
 private fun ArchiveReference.transformAndWriteClass(
-    name: String, // Fake location
-    context: ATContext
+        name: String, // Fake location
+        context: ATContext
 ) {
     val entry = checkNotNull(
-        reader["$name.class"]
+            reader["$name.class"]
     ) { "Failed to find class '$name' when transforming archive: '${this.name}'" }
 
     val resolve = Archives.resolve(
-        ClassReader(entry.resource.open()),
-        context.config,
-        context.make()
+            ClassReader(entry.resource.open()),
+            context.config,
+            context.make()
     )
 
     val resource = ProvidedResource(entry.resource.uri) {
@@ -196,10 +227,10 @@ private fun ArchiveReference.transformAndWriteClass(
     val transformedNode = resource.open().parseNode
 
     val transformedEntry = ArchiveReference.Entry(
-        transformedNode.name + ".class",
-        resource,
-        false,
-        this
+            transformedNode.name + ".class",
+            resource,
+            false,
+            this
     )
 
     if (transformedNode.name != name)
@@ -224,10 +255,10 @@ private fun ArchiveReference.transformAndWriteClass(
 //}
 
 private class MappingAwareClassWriter(
-    private val context: ATContext
+        private val context: ATContext
 ) : AwareClassWriter(
-    context.dependencies,
-    Archives.WRITER_FLAGS,
+        context.dependencies,
+        Archives.WRITER_FLAGS,
 ) {
     private fun getMappedNode(name: String): HierarchyNode? {
         val node = context.theArchive.reader["$name.class"]?.let {
@@ -239,7 +270,7 @@ private class MappingAwareClassWriter(
             node
         } ?: run {
             val fakeClassName =
-                context.mappings.mapClassName(name, MappingDirection.TO_FAKE) ?: return null
+                    context.mappings.mapClassName(name, MappingDirection.TO_FAKE) ?: return null
 
             val entryInput = context.theArchive.reader["$fakeClassName.class"]?.resource?.open() ?: return null
             val reader = ClassReader(entryInput)
@@ -264,29 +295,29 @@ private class MappingAwareClassWriter(
 public typealias ClassInheritanceTree = Map<String, ClassInheritancePath>
 
 public data class ClassInheritancePath(
-    val name: String,
-    val superClass: ClassInheritancePath?,
-    val interfaces: List<ClassInheritancePath>
+        val name: String,
+        val superClass: ClassInheritancePath?,
+        val interfaces: List<ClassInheritancePath>
 )
 
 public fun createFakeInheritancePath(
-    entry: ArchiveReference.Entry,
-    reader: ArchiveReference.Reader
+        entry: ArchiveReference.Entry,
+        reader: ArchiveReference.Reader
 ): ClassInheritancePath {
     val node = entry.resource.open().parseNode
 
     return ClassInheritancePath(
-        node.name,
+            node.name,
 
-        reader[node.superName + ".class"]?.let { createFakeInheritancePath(it, reader) },
-        node.interfaces?.mapNotNull { n ->
-            reader["$n.class"]?.let { createFakeInheritancePath(it, reader) }
-        } ?: listOf()
+            reader[node.superName + ".class"]?.let { createFakeInheritancePath(it, reader) },
+            node.interfaces?.mapNotNull { n ->
+                reader["$n.class"]?.let { createFakeInheritancePath(it, reader) }
+            } ?: listOf()
     )
 }
 
 public class DelegatingArchiveReader(
-    private val archives: List<ArchiveReference>
+        private val archives: List<ArchiveReference>
 ) : ArchiveReference.Reader {
     override fun entries(): Sequence<ArchiveReference.Entry> = sequence {
         archives.forEach {
@@ -303,18 +334,18 @@ public class DelegatingArchiveReader(
 
 public fun createFakeInheritanceTree(reader: ArchiveReference.Reader): ClassInheritanceTree {
     return reader.entries()
-        .filterNot(ArchiveReference.Entry::isDirectory)
-        .filter { it.name.endsWith(".class") }
-        .map { createFakeInheritancePath(it, reader) }
-        .associateBy { it.name }
+            .filterNot(ArchiveReference.Entry::isDirectory)
+            .filter { it.name.endsWith(".class") }
+            .map { createFakeInheritancePath(it, reader) }
+            .associateBy { it.name }
 }
 
 
 public fun transformArchive(
-    archive: ArchiveReference,
-    dependencies: List<ArchiveTree>,
-    mappings: ArchiveMapping,
-    direction: MappingDirection,
+        archive: ArchiveReference,
+        dependencies: List<ArchiveTree>,
+        mappings: ArchiveMapping,
+        direction: MappingDirection,
 ) {
     val inheritanceTree: ClassInheritanceTree = createFakeInheritanceTree(archive.reader)
 
@@ -323,8 +354,8 @@ public fun transformArchive(
     val context = ATContext(archive, dependencies, mappings, config, direction)
 
     archive.reader.entries()
-        .filter { it.name.endsWith(".class") }
-        .forEach { e ->
-            archive.transformAndWriteClass(e.name.removeSuffix(".class"), context)
-        }
+            .filter { it.name.endsWith(".class") }
+            .forEach { e ->
+                archive.transformAndWriteClass(e.name.removeSuffix(".class"), context)
+            }
 }
