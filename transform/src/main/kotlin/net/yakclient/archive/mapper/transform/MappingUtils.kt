@@ -16,6 +16,10 @@ public fun ArchiveMapping.getMappedClass(jvmName: String, direction: MappingDire
     )]
 }
 
+public fun ArchiveMapping.mapClassOrType(type: String, direction: MappingDirection) : String {
+    return mapClassName(type, direction)  ?: mapType(type, direction)
+}
+
 public fun ArchiveMapping.mapClassName(jvmName: String, direction: MappingDirection): String? {
     val mappedClass = getMappedClass(jvmName, direction)
 
@@ -25,6 +29,16 @@ public fun ArchiveMapping.mapClassName(jvmName: String, direction: MappingDirect
     }?.name
 }
 
+//public fun ArchiveMapping.mapArray(jvmName: String, direction: MappingDirection) : String? {
+//    if (jvmName.startsWith("[")) {
+//        return  mapArray(jvmName.removePrefix("["), direction)?.let { "[$it" }
+//    } else if (jvmName.startsWith("L")) {
+//        val trimmedName = jvmName.removePrefix("L").removeSuffix(";")
+//        return mapArray(trimmedName, direction)?.let { "L$it;" }
+//    } else {
+//        return mapClassName(jvmName, direction)
+//    }
+//}
 // All expected to be in jvm class format. ie. org/example/MyClass
 // Maps the
 public fun ArchiveMapping.mapType(jvmType: String, direction: MappingDirection): String {
@@ -33,7 +47,7 @@ public fun ArchiveMapping.mapType(jvmType: String, direction: MappingDirection):
     else if (jvmType.startsWith("[")) {
         "[" + mapType(jvmType.substring(1 until jvmType.length), direction)
     } else {
-        val jvmName = jvmType.trim('L', ';')
+        val jvmName = jvmType.removePrefix("L").removeSuffix(";")
         val mapClassName = mapClassName(jvmName, direction) ?: jvmName
         "L$mapClassName;"
     }

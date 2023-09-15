@@ -4,6 +4,7 @@ import net.yakclient.archive.mapper.parsers.ProGuardMappingParser
 import net.yakclient.archive.mapper.transform.MappingDirection
 import net.yakclient.archive.mapper.transform.transformArchive
 import net.yakclient.archives.Archives
+import net.yakclient.common.util.resolve
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.io.FileOutputStream
@@ -35,6 +36,8 @@ class TestArchiveMapping {
             direction = MappingDirection.TO_REAL,
         )
 
+
+
         val createTempFile = Files.createTempFile(UUID.randomUUID().toString(), ".jar")
         JarOutputStream(FileOutputStream(createTempFile.toFile())).use { target ->
             archive.reader.entries().forEach { e ->
@@ -57,9 +60,11 @@ class TestArchiveMapping {
                 target.closeEntry()
             }
         }
-        val resolve = Files.createTempFile("out", ".jar")
+        val resolve = Files.createTempDirectory("out") resolve "out.jar"
+        println()
         println(resolve)
 
         Files.copy(createTempFile, resolve, StandardCopyOption.REPLACE_EXISTING)
     }
+
 }

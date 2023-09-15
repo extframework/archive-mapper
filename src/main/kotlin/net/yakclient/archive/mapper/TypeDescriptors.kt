@@ -1,5 +1,23 @@
 package net.yakclient.archive.mapper
 
+public fun fromInternalType(type: String) : TypeIdentifier = when (type) {
+    "Z" -> PrimitiveTypeIdentifier.BOOLEAN
+    "C" -> PrimitiveTypeIdentifier.CHAR
+    "B" -> PrimitiveTypeIdentifier.BYTE
+    "S" -> PrimitiveTypeIdentifier.SHORT
+    "I" -> PrimitiveTypeIdentifier.INT
+    "F" -> PrimitiveTypeIdentifier.FLOAT
+    "J" -> PrimitiveTypeIdentifier.LONG
+    "D" -> PrimitiveTypeIdentifier.DOUBLE
+    "V" -> PrimitiveTypeIdentifier.VOID
+    else -> {
+        if (type.startsWith("[")) {
+
+            ArrayTypeIdentifier(fromInternalType(type.removePrefix("[")))
+        } else ClassTypeIdentifier(type)
+    }
+}
+
 public enum class PrimitiveTypeIdentifier(
     _descriptor: Char
 ) : TypeIdentifier {
