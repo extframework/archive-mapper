@@ -1,9 +1,9 @@
 plugins {
-    kotlin("jvm") version "1.6.21"
+    kotlin("jvm") version "1.9.21"
 
     id("signing")
     id("maven-publish")
-    id("org.jetbrains.dokka") version "1.6.21"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 tasks.wrapper {

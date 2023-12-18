@@ -52,7 +52,6 @@ public object ProGuardMappingParser : MappingParser {
 
                 return realMap + fakeMap
             }
-//                ObfuscationMap(associateBy { mapper(it.realName, it) to mapper(it.fakeName, it) })
 
             // List of classes in archive.
             val classes = ArrayList<ClassMapping>()
