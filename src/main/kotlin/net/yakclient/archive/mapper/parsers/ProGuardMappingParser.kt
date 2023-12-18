@@ -90,7 +90,7 @@ public object ProGuardMappingParser : MappingParser {
                     line = reader.readLine().trim() // Read a new line
 
                     fun fakeIdentifier(type: TypeIdentifier): TypeIdentifier {
-                        if (type is WrappedTypeIdentifier) type.withNew(fakeIdentifier(type.innerType))
+                        if (type is WrappedTypeIdentifier) return type.withNew(fakeIdentifier(type.innerType))
 
                         if (type !is ClassTypeIdentifier) return type
                         val fullQualifier = typeMappings[type.fullQualifier]

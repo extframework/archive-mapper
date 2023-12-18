@@ -1,7 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.21"
 
-    id("signing")
     id("maven-publish")
     id("org.jetbrains.dokka") version "1.9.10"
 }

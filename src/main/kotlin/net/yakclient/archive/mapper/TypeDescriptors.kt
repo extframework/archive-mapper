@@ -12,9 +12,8 @@ public fun fromInternalType(type: String) : TypeIdentifier = when (type) {
     "V" -> PrimitiveTypeIdentifier.VOID
     else -> {
         if (type.startsWith("[")) {
-
             ArrayTypeIdentifier(fromInternalType(type.removePrefix("[")))
-        } else ClassTypeIdentifier(type)
+        } else ClassTypeIdentifier(type.removePrefix("L").removeSuffix(";"))
     }
 }
 
