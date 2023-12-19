@@ -39,7 +39,6 @@ public object TinyV2MappingsParser : MappingParser {
                             MethodIdentifier(
                                 m.getName("intermediary"),
                                 parameters(intermediaryDesc.desc)
-
                                     .map(::fromInternalType),
                                 MappingType.REAL
                             ),

@@ -341,12 +341,11 @@ private class MappingAwareClassWriter(
             val node = ClassNode()
             reader.accept(node, 0)
 
-            context.config.ct(node)
-            node.methods.forEach(context.config.mt)
-            node.fields.forEach(context.config.ft)
-
             node
         }
+        context.config.ct(node)
+        node.methods.forEach(context.config.mt)
+        node.fields.forEach(context.config.ft)
 
         return UnloadedClassNode(node)
     }
