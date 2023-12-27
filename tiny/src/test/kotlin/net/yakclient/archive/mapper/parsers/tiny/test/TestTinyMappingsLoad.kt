@@ -1,7 +1,7 @@
 package net.yakclient.archive.mapper.parsers.tiny.test
 
 import net.yakclient.archive.mapper.*
-import net.yakclient.archive.mapper.parsers.tiny.TinyMappingsParser
+import net.yakclient.archive.mapper.parsers.tiny.TinyV1MappingsParser
 import java.net.URL
 import kotlin.test.Test
 
@@ -9,7 +9,7 @@ class TestTinyMappingsLoad {
     @Test
     fun `Test basic load`() {
         val `in` = URL("https://raw.githubusercontent.com/FabricMC/intermediary/master/mappings/1.20.1.tiny").openStream()
-        val mappings = TinyMappingsParser.parse(`in`)
+        val mappings = TinyV1MappingsParser.parse(`in`)
 
         val classMapping = mappings.classes[ClassIdentifier("v", MappingType.FAKE)]
 
