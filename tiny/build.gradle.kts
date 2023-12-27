@@ -10,7 +10,7 @@ dependencies {
     implementation("net.yakclient:archives:1.1-SNAPSHOT") {
         isChanging = true
     }
-    implementation("net.fabricmc:tiny-mappings-parser:0.3.0+build.17")
+    implementation("net.fabricmc:mapping-io:0.5.0")
 
     implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 }
