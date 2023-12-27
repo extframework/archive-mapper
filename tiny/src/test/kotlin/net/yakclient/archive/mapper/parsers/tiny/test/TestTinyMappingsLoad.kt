@@ -1,7 +1,9 @@
 package net.yakclient.archive.mapper.parsers.tiny.test
 
+import net.fabricmc.mappingio.format.tiny.Tiny1FileWriter
 import net.yakclient.archive.mapper.*
 import net.yakclient.archive.mapper.parsers.tiny.TinyV1MappingsParser
+import java.io.FileWriter
 import java.net.URL
 import kotlin.test.Test
 
@@ -11,6 +13,7 @@ class TestTinyMappingsLoad {
         val `in` = URL("https://raw.githubusercontent.com/FabricMC/intermediary/master/mappings/1.20.1.tiny").openStream()
         val mappings = TinyV1MappingsParser.parse(`in`)
 
+        Tiny1FileWriter(FileWriter(""))
         val classMapping = mappings.classes[ClassIdentifier("v", MappingType.FAKE)]
 
         //CLASS	u	net/minecraft/class_6319
