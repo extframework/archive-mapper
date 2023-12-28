@@ -13,16 +13,15 @@ class TestTinyMappingsLoad {
         val `in` = URL("https://raw.githubusercontent.com/FabricMC/intermediary/master/mappings/1.20.1.tiny").openStream()
         val mappings = TinyV1MappingsParser.parse(`in`)
 
-        Tiny1FileWriter(FileWriter(""))
-        val classMapping = mappings.classes[ClassIdentifier("v", MappingType.FAKE)]
+        val classMapping = mappings.classes[ClassIdentifier("v", "official")]
 
         //CLASS	u	net/minecraft/class_6319
-        check(classMapping?.realIdentifier?.name == "net/minecraft/class_4239")
+        check(classMapping?.identifiers?.get("intermediary")?.name == "net/minecraft/class_4239")
 
         //METHOD v	(Ljava/lang/String;)Ljava/lang/String;	a	method_34675
-        check(classMapping?.methods?.get(MethodIdentifier("method_34675", listOf(fromInternalType("Ljava/lang/String;")), MappingType.REAL))?.fakeIdentifier?.name == "a")
+        check(classMapping?.methods?.get(MethodIdentifier("method_34675", listOf(fromInternalType("Ljava/lang/String;")), "intermediary"))?.getIdentifier("official")?.name == "a")
 
         //FIELD	v	Ljava/util/regex/Pattern;	a	field_18956
-        check(classMapping?.fields?.get(FieldIdentifier("a", MappingType.FAKE))?.realIdentifier?.name == "field_18956")
+        check(classMapping?.fields?.get(FieldIdentifier("a", "official"))?.getIdentifier("intermediary")?.name == "field_18956")
     }
 }

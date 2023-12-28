@@ -1,19 +1,7 @@
-repositories {
-    mavenCentral()
-    maven {
-        url = uri("https://maven.fabricmc.net/")
-    }
-}
-
 dependencies {
     implementation(project(":"))
-    implementation("net.yakclient:archives:1.1-SNAPSHOT") {
-        isChanging = true
-    }
-    implementation("net.fabricmc:mapping-io:0.5.0")
-
-    implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 }
+
 
 task<Jar>("sourcesJar") {
     archiveClassifier.set("sources")
@@ -26,16 +14,16 @@ task<Jar>("javadocJar") {
 }
 publishing {
     publications {
-        create<MavenPublication>("archive-mapper-tiny-maven") {
+        create<MavenPublication>("archive-mapper-proguard-maven") {
             from(components["java"])
             artifact(tasks["sourcesJar"])
             artifact(tasks["javadocJar"])
 
-            artifactId = "archive-mapper-tiny"
+            artifactId = "archive-mapper-proguard"
 
             pom {
-                name.set("Archive Mapper Tiny mappings support")
-                description.set("A mappings parser with support for tiny")
+                name.set("Archive Mapper Proguard mappings support")
+                description.set("A mappings parser with support for Proguard")
                 url.set("https://github.com/yakclient/archive-mapper")
 
                 packaging = "jar"
@@ -45,10 +33,6 @@ publishing {
                     val yakclientRepositoryNode = repositoriesNode.appendNode("repository")
                     yakclientRepositoryNode.appendNode("id", "yakclient")
                     yakclientRepositoryNode.appendNode("url", "http://maven.yakclient.net/snapshots")
-
-                    val fabricRepositoryNode = repositoriesNode.appendNode("repository")
-                    fabricRepositoryNode.appendNode("id", "fabric")
-                    fabricRepositoryNode.appendNode("url", "https://maven.fabricmc.net/")
                 }
 
                 developers {

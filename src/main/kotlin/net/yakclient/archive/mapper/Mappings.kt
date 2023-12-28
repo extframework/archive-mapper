@@ -1,66 +1,61 @@
 package net.yakclient.archive.mapper
 
 public data class ArchiveMapping(
-    val classes: Map<ClassIdentifier, ClassMapping>,
-) : MappingNode<ArchiveIdentifier> {
-    override val realIdentifier: ArchiveIdentifier = ArchiveIdentifier.Real
-    override val fakeIdentifier: ArchiveIdentifier = ArchiveIdentifier.Fake
+    override val namespaces: Set<String>,
+    override val identifiers: MappingValueContainer< ArchiveIdentifier>,
 
-    override fun toString(): String {
-        return "ArchiveMapping{realIdentifier='$realIdentifier', fakeIdentifier='$fakeIdentifier'}"
-    }
-}
+    val classes: MappingNodeContainer<ClassIdentifier, ClassMapping>,
+) : MappingNode<ArchiveIdentifier>
 
-public sealed class ArchiveIdentifier : MappingIdentifier {
-    override val name: String = ""
+public data class ArchiveIdentifier(
+    override val name: String, override val namespace: String
 
-    public object Real : ArchiveIdentifier() {
-        override val type: MappingType = MappingType.REAL
-    }
-
-    public object Fake : ArchiveIdentifier() {
-        override val type: MappingType = MappingType.FAKE
-    }
+) : MappingIdentifier {
+//    override val name: String = ""
+//
+//    public data object Real : ArchiveIdentifier() {
+//        override val type: String = MappingType.REAL
+//    }
+//
+//    public data object Fake : ArchiveIdentifier() {
+//        override val type: MappingType = MappingType.FAKE
+//    }
 }
 
 public data class ClassMapping(
-    override val realIdentifier: ClassIdentifier,
-    override val fakeIdentifier: ClassIdentifier,
-    public val methods: Map<MethodIdentifier, MethodMapping>,
-    public val fields: Map<FieldIdentifier, FieldMapping>,
-) : MappingNode<ClassIdentifier> {
-    override fun toString(): String {
-        return "ClassMapping{realIdentifier='$realIdentifier', fakeIdentifier='$fakeIdentifier'}"
-    }
-}
+    override val namespaces: Set<String>,
+    override val identifiers: MappingValueContainer< ClassIdentifier>,
+
+    public val methods: MappingNodeContainer<MethodIdentifier, MethodMapping>,
+    public val fields: MappingNodeContainer<FieldIdentifier, FieldMapping>,
+) : MappingNode<ClassIdentifier>
 
 public data class ClassIdentifier(
-    override val name: String, override val type: MappingType
+    override val name: String, override val namespace: String
 ) : MappingIdentifier
 
 public data class MethodMapping(
-    override val realIdentifier: MethodIdentifier,
-    override val fakeIdentifier: MethodIdentifier,
-    public val lnStart: Int?,
-    public val lnEnd: Int?,
-    public val originalLnStart: Int?,
-    public val originalLnEnd: Int?,
-    public val realReturnType: TypeIdentifier,
-    public val fakeReturnType: TypeIdentifier
+    override val namespaces: Set<String>,
+    override val identifiers: MappingValueContainer< MethodIdentifier>,
+
+    public val lnStart: MappingValueContainer<Int>?,
+    public val lnEnd: MappingValueContainer<Int>?,
+
+    public val returnType: MappingValueContainer<TypeIdentifier>,
 ) : MappingNode<MethodIdentifier>
 
 public data class MethodIdentifier(
-    override val name: String, val parameters: List<TypeIdentifier>, override val type: MappingType
+    override val name: String, val parameters: List<TypeIdentifier>, override val namespace: String
 ) : MappingIdentifier
 
 public data class FieldMapping(
-    override val realIdentifier: FieldIdentifier,
-    override val fakeIdentifier: FieldIdentifier,
-    public val realType: TypeIdentifier,
-    public val fakeType: TypeIdentifier
+    override val namespaces: Set<String>,
+    override val identifiers: MappingValueContainer< FieldIdentifier>,
+
+    public val type: MappingValueContainer<TypeIdentifier>
 ) : MappingNode<FieldIdentifier>
 
 public data class FieldIdentifier(
     override val name: String,
-    override val type: MappingType
+    override val namespace: String
 ) : MappingIdentifier

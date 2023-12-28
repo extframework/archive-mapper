@@ -1,7 +1,7 @@
-package net.yakclient.archive.mapper.test.parser
+package net.yakclient.archive.mapper.parsers.proguard.test
 
 import net.yakclient.archive.mapper.*
-import net.yakclient.archive.mapper.parsers.ProGuardMappingParser
+import net.yakclient.archive.mapper.parsers.proguard.ProGuardMappingParser
 import java.net.URI
 import kotlin.test.Test
 
@@ -83,23 +83,25 @@ class ProGuardParserTest {
 
     @Test
     fun `Test Pro Guard Parsing`() {
-        val parser = ProGuardMappingParser
+        val parser = ProGuardMappingParser(
+            "official", "named"
+        )
 
         val mappings = parser.parse(
             URI("https://launcher.mojang.com/v1/objects/a661c6a55a0600bd391bdbbd6827654c05b2109c/client.txt").toURL()
                 .openStream()
         )
 
-        println(mappings.classes.size)
+        println(mappings.classes.values.size)
 
         val title = checkNotNull(
-            mappings.classes[ClassIdentifier(
+            mappings.classes.get(ClassIdentifier(
                 "net/minecraft/client/gui/screens/TitleScreen",
-                MappingType.REAL
-            )]
-        )
+                "named"
+            )
+        ))
 
-        val method = title.methods[MethodIdentifier(
+        val method = title.methods.get(MethodIdentifier(
             "a",
             listOf(
                 ClassTypeIdentifier("dtm"),
@@ -107,11 +109,10 @@ class ProGuardParserTest {
                 PrimitiveTypeIdentifier.INT,
                 PrimitiveTypeIdentifier.FLOAT
             ),
-            MappingType.FAKE
-        )]
+            "official"
+        ))
 
-        title.methods.size
 
-        println(method?.realIdentifier?.name)
+        println(method?.identifiers?.get("named")?.name)
     }
 }

@@ -29,7 +29,8 @@ private fun TypeIdentifier.mostInnerClass(): String {
 
 public fun mappingTransformConfigFor(
     mappings: ArchiveMapping,
-    direction: MappingDirection,
+    fromNamespace: String,
+    toNamespace: String,
     tree: ClassInheritanceTree
 ): TransformerConfig.Mutable {
     fun ClassInheritancePath.toCheck(): List<String> {
@@ -40,35 +41,38 @@ public fun mappingTransformConfigFor(
         transformClass { classNode: ClassNode ->
             mappings.run {
                 classNode.fields.forEach { fieldNode ->
-                    fieldNode.desc = mapType(fieldNode.desc, direction)
-                    fieldNode.name = mapFieldName(classNode.name, fieldNode.name, direction) ?: fieldNode.name
+                    fieldNode.desc = mapType(fieldNode.desc, fromNamespace, toNamespace)
+                    fieldNode.name =
+                        mapFieldName(classNode.name, fieldNode.name, fromNamespace, toNamespace) ?: fieldNode.name
                     if (fieldNode.signature != null)
-                        fieldNode.signature = mapAnySignature(fieldNode.signature, direction)
+                        fieldNode.signature = mapAnySignature(fieldNode.signature, fromNamespace, toNamespace)
                 }
 
                 classNode.methods.forEach { methodNode ->
                     // Mapping other references
-                    methodNode.name = mapMethodName(classNode.name, methodNode.name, methodNode.desc, direction)
-                        ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
-                            mapMethodName(n, methodNode.name, methodNode.desc, direction)
-                        } ?: methodNode.name
+                    methodNode.name =
+                        mapMethodName(classNode.name, methodNode.name, methodNode.desc, fromNamespace, toNamespace)
+                            ?: (classNode.interfaces + classNode.superName).filterNotNull().firstNotNullOfOrNull { n ->
+                                mapMethodName(n, methodNode.name, methodNode.desc, fromNamespace, toNamespace)
+                            } ?: methodNode.name
 
-                    methodNode.desc = mapMethodDesc(methodNode.desc, direction)
+                    methodNode.desc = mapMethodDesc(methodNode.desc, fromNamespace, toNamespace)
 
                     if (methodNode.signature != null)
-                        methodNode.signature = mapAnySignature(methodNode.signature, direction)
+                        methodNode.signature = mapAnySignature(methodNode.signature, fromNamespace, toNamespace)
 
                     methodNode.exceptions = methodNode.exceptions.map {
-                        mapClassName(it, direction) ?: it
+                        mapClassName(it, fromNamespace, toNamespace) ?: it
                     }
 
                     methodNode.localVariables?.forEach {
-                        it.desc = mapType(it.desc, direction)
-                        if (it.signature != null) it.signature = mapAnySignature(it.signature, direction)
+                        it.desc = mapType(it.desc, fromNamespace, toNamespace)
+                        if (it.signature != null) it.signature =
+                            mapAnySignature(it.signature, fromNamespace, toNamespace)
                     }
 
                     methodNode.tryCatchBlocks.forEach {
-                        if (it.type != null) it.type = mapClassName(it.type, direction) ?: it.type
+                        if (it.type != null) it.type = mapClassName(it.type, fromNamespace, toNamespace) ?: it.type
                     }
 
                     // AbstractInsnNode
@@ -79,12 +83,14 @@ public fun mappingTransformConfigFor(
                                     mapFieldName(
                                         it,
                                         insnNode.name,
-                                        direction
+                                        fromNamespace,
+                                        toNamespace
                                     )
                                 } ?: insnNode.name
 
-                                insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
-                                insnNode.desc = mapType(insnNode.desc, direction)
+                                insnNode.owner =
+                                    mapClassName(insnNode.owner, fromNamespace, toNamespace) ?: insnNode.owner
+                                insnNode.desc = mapType(insnNode.desc, fromNamespace, toNamespace)
                             }
 
                             is InvokeDynamicInsnNode -> {
@@ -99,16 +105,17 @@ public fun mappingTransformConfigFor(
                                         )
                                     ) Handle(
                                         tag,
-                                        mapClassName(owner, direction) ?: owner,
+                                        mapClassName(owner, fromNamespace, toNamespace) ?: owner,
                                         tree[owner]?.toCheck()?.firstNotNullOfOrNull {
                                             mapMethodName(
                                                 it,
                                                 name,
                                                 desc,
-                                                direction
+                                                fromNamespace,
+                                                toNamespace
                                             )
                                         } ?: name,
-                                        mapMethodDesc(desc, direction),
+                                        mapMethodDesc(desc, fromNamespace, toNamespace),
                                         isInterface
                                     ) else if (
                                         tag.equalsAny(
@@ -119,15 +126,16 @@ public fun mappingTransformConfigFor(
                                         )
                                     ) Handle(
                                         tag,
-                                        mapClassName(owner, direction) ?: owner,
+                                        mapClassName(owner, fromNamespace, toNamespace) ?: owner,
                                         tree[owner]?.toCheck()?.firstNotNullOfOrNull {
                                             mapFieldName(
                                                 it,
                                                 name,
-                                                direction
+                                                fromNamespace,
+                                                toNamespace
                                             )
                                         } ?: name,
-                                        mapType(desc, direction),
+                                        mapType(desc, fromNamespace, toNamespace),
                                         isInterface
                                     ) else throw IllegalArgumentException("Unknown tag type : '$tag' for invoke dynamic instruction : '$insnNode' with handle: '$this'")
                                 }
@@ -142,11 +150,19 @@ public fun mappingTransformConfigFor(
                                                 Type.ARRAY, Type.OBJECT -> Type.getType(
                                                     mapType(
                                                         it.internalName,
-                                                        direction
+                                                        fromNamespace,
+                                                        toNamespace
                                                     )
                                                 )
 
-                                                Type.METHOD -> Type.getType(mapMethodDesc(it.internalName, direction))
+                                                Type.METHOD -> Type.getType(
+                                                    mapMethodDesc(
+                                                        it.internalName,
+                                                        fromNamespace,
+                                                        toNamespace
+                                                    )
+                                                )
+
                                                 else -> it
                                             }
                                         }
@@ -160,45 +176,63 @@ public fun mappingTransformConfigFor(
                                 insnNode.desc =
                                     mapMethodDesc(
                                         insnNode.desc,
-                                        direction
+                                        fromNamespace,
+                                        toNamespace
                                     ) // Expected descriptor type of the generated call site
                             }
 
                             is MethodInsnNode -> {
                                 if (insnNode.owner.startsWith("[")) {
-                                    insnNode.owner = mapType(insnNode.owner, direction)
+                                    insnNode.owner = mapType(insnNode.owner, fromNamespace, toNamespace)
                                 } else {
                                     insnNode.name = tree[insnNode.owner]?.toCheck()?.firstNotNullOfOrNull {
                                         mapMethodName(
                                             it,
                                             insnNode.name,
                                             insnNode.desc,
-                                            direction
+                                            fromNamespace,
+                                            toNamespace
                                         )
                                     } ?: insnNode.name
 
-                                    insnNode.owner = mapClassName(insnNode.owner, direction) ?: insnNode.owner
-                                    insnNode.desc = mapMethodDesc(insnNode.desc, direction)
+                                    insnNode.owner =
+                                        mapClassName(insnNode.owner, fromNamespace, toNamespace) ?: insnNode.owner
+                                    insnNode.desc = mapMethodDesc(insnNode.desc, fromNamespace, toNamespace)
                                 }
                             }
 
                             is MultiANewArrayInsnNode -> {
-                                insnNode.desc = mapType(insnNode.desc, direction)
+                                insnNode.desc = mapType(insnNode.desc, fromNamespace, toNamespace)
                             }
 
                             is TypeInsnNode -> {
                                 insnNode.desc = if (insnNode.desc.startsWith("[")) mapType(
                                     insnNode.desc,
-                                    direction
-                                ) else mapClassName(insnNode.desc, direction) ?: insnNode.desc
+                                    fromNamespace,
+                                    toNamespace
+                                ) else mapClassName(insnNode.desc, fromNamespace, toNamespace) ?: insnNode.desc
                             }
 
                             is LdcInsnNode -> {
                                 when (val it = insnNode.cst) {
                                     is Type -> {
                                         insnNode.cst = when (it.sort) {
-                                            Type.ARRAY, Type.OBJECT -> Type.getType(mapType(it.internalName, direction))
-                                            Type.METHOD -> Type.getType(mapMethodDesc(it.internalName, direction))
+                                            Type.ARRAY, Type.OBJECT -> Type.getType(
+                                                mapType(
+                                                    it.internalName,
+                                                    fromNamespace,
+                                                    toNamespace
+                                                )
+                                            )
+
+                                            Type.METHOD -> Type.getType(
+                                                mapMethodDesc(
+                                                    it.internalName,
+                                                    fromNamespace,
+                                                    toNamespace
+                                                )
+                                            )
+
                                             else -> it
                                         }
                                     }
@@ -207,42 +241,48 @@ public fun mappingTransformConfigFor(
                         }
                     }
                 }
-                classNode.name = mapClassName(classNode.name, direction) ?: classNode.name
+                classNode.name = mapClassName(classNode.name, fromNamespace, toNamespace) ?: classNode.name
 
                 if (classNode.signature != null)
-                    classNode.signature = mapAnySignature(classNode.signature, direction)
+                    classNode.signature = mapAnySignature(classNode.signature, fromNamespace, toNamespace)
 
-                classNode.interfaces = classNode.interfaces.map { mapClassName(it, direction) ?: it }
+                classNode.interfaces = classNode.interfaces.map { mapClassName(it, fromNamespace, toNamespace) ?: it }
 
-                classNode.outerClass = if (classNode.outerClass != null) mapClassName(classNode.outerClass, direction)
-                    ?: classNode.outerClass else null
+                classNode.outerClass =
+                    if (classNode.outerClass != null) mapClassName(classNode.outerClass, fromNamespace, toNamespace)
+                        ?: classNode.outerClass else null
 
-                classNode.superName = mapClassName(classNode.superName, direction) ?: classNode.superName
+                classNode.superName =
+                    mapClassName(classNode.superName, fromNamespace, toNamespace) ?: classNode.superName
 
                 classNode.nestHostClass =
-                    if (classNode.nestHostClass != null) mapClassName(classNode.nestHostClass, direction)
+                    if (classNode.nestHostClass != null) mapClassName(
+                        classNode.nestHostClass,
+                        fromNamespace,
+                        toNamespace
+                    )
                         ?: classNode.nestHostClass else null
 
                 classNode.nestMembers = classNode.nestMembers?.map {
-                    mapClassName(it, direction) ?: it
+                    mapClassName(it, fromNamespace, toNamespace) ?: it
                 } ?: ArrayList()
 
                 classNode.innerClasses.forEach { n ->
                     n.outerName =
-                        if (n.outerName != null) mapClassName(n.outerName, direction)
+                        if (n.outerName != null) mapClassName(n.outerName, fromNamespace, toNamespace)
                             ?: n.outerName else n.outerName
-                    n.name = mapClassName(n.name, direction) ?: n.name
+                    n.name = mapClassName(n.name, fromNamespace, toNamespace) ?: n.name
                     n.innerName = if (n.innerName != null) n.name.substringAfter("\$") else null
                 }
 
                 if (classNode.recordComponents != null) classNode.recordComponents.forEach {
-                    it.descriptor = mapType(it.descriptor, direction)
-                    if (it.signature != null) it.signature = mapAnySignature(it.signature, direction)
+                    it.descriptor = mapType(it.descriptor, fromNamespace, toNamespace)
+                    if (it.signature != null) it.signature = mapAnySignature(it.signature, fromNamespace, toNamespace)
                 }
 
                 if (classNode.permittedSubclasses != null)
                     classNode.permittedSubclasses = classNode.permittedSubclasses.map {
-                        mapClassName(it, direction)
+                        mapClassName(it, fromNamespace, toNamespace)
                     }
             }
         }
@@ -256,7 +296,8 @@ private data class ATContext(
     val dependencies: List<ArchiveTree>,
     val mappings: ArchiveMapping,
     val config: TransformerConfig,
-    val direction: MappingDirection
+    val fromNamespace: String,
+    val toNamespace: String
 ) {
     fun make(): ClassWriter = MappingAwareClassWriter(
         this
@@ -325,24 +366,14 @@ private class MappingAwareClassWriter(
     Archives.WRITER_FLAGS,
 ) {
     private fun getMappedNode(name: String): HierarchyNode? {
-        val node = context.theArchive.reader["$name.class"]?.let {
-            val entryInput = it.resource.open()
-            val reader = ClassReader(entryInput)
-            val node = ClassNode()
-            reader.accept(node, 0)
+        val node = context.theArchive.reader["$name.class"]
+            ?.resource?.open()?.parseNode ?: run {
+            val otherName =
+                // Switch it as we want to go the other direction
+                context.mappings.mapClassName(name, context.toNamespace, context.fromNamespace) ?: return@run null
+            context.theArchive.reader["$otherName.class"]?.resource?.open()
+        }?.parseNode ?: return null
 
-            node
-        } ?: run {
-            val fakeClassName =
-                context.mappings.mapClassName(name, MappingDirection.TO_FAKE) ?: return null
-
-            val entryInput = context.theArchive.reader["$fakeClassName.class"]?.resource?.open() ?: return null
-            val reader = ClassReader(entryInput)
-            val node = ClassNode()
-            reader.accept(node, 0)
-
-            node
-        }
         context.config.ct(node)
         node.methods.forEach(context.config.mt)
         node.fields.forEach(context.config.ft)
@@ -403,18 +434,18 @@ public fun createFakeInheritanceTree(reader: ArchiveReference.Reader): ClassInhe
         .associateBy { it.name }
 }
 
-
 public fun transformArchive(
     archive: ArchiveReference,
     dependencies: List<ArchiveTree>,
     mappings: ArchiveMapping,
-    direction: MappingDirection,
+    fromNamespace: String,
+    toNamespace: String,
 ) {
     val inheritanceTree: ClassInheritanceTree = createFakeInheritanceTree(archive.reader)
 
-    val config = mappingTransformConfigFor(mappings, direction, inheritanceTree)
+    val config = mappingTransformConfigFor(mappings, fromNamespace, toNamespace, inheritanceTree)
 
-    val context = ATContext(archive, dependencies, mappings, config, direction)
+    val context = ATContext(archive, dependencies, mappings, config, fromNamespace, toNamespace)
 
     archive.reader.entries()
         .filter { it.name.endsWith(".class") }

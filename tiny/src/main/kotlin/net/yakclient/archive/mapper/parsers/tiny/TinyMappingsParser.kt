@@ -1,8 +1,7 @@
 package net.yakclient.archive.mapper.parsers.tiny
 
 import net.fabricmc.mappingio.MappingVisitor
-import net.fabricmc.mappingio.format.tiny.Tiny1FileReader
-import net.fabricmc.mappingio.tree.MappingTree
+import net.fabricmc.mappingio.tree.MappingTree.ElementMapping
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.yakclient.archive.mapper.*
 import net.yakclient.archives.extension.parameters
@@ -13,72 +12,112 @@ import java.io.InputStreamReader
 import java.io.Reader
 
 public interface TinyReader {
+    public val version: String
+
     public fun read(reader: Reader, visitor: MappingVisitor)
 }
 
 public open class TinyMappingsParser(
     protected open val reader: TinyReader
 ) : MappingParser {
-    override val name: String = "tinyV2"
-    private fun <I : MappingIdentifier, T : MappingNode<I>> List<T>.toBiMap(): Map<I, T> {
-        val realMap = associateBy { it.realIdentifier }
-        val fakeMap = associateBy { it.fakeIdentifier }
-
-        return realMap + fakeMap
-    }
+    override val name: String = "tiny" + reader.version
 
     override final fun parse(mappingsIn: InputStream): ArchiveMapping {
         val tree = MemoryMappingTree()
         reader.read(BufferedReader(InputStreamReader(mappingsIn)), tree)
+        val namespaces = (tree.dstNamespaces + tree.srcNamespace).filterNotNull().toSet()
+
+//        fun <T : ElementMapping, K : MappingIdentifier> T.toValueContainer(transform: (T, namespace: String) -> K?): MappingValueContainer<K> {
+//            return object : MappingValueContainer<K> {
+//                override fun get(namespace: String): K? {
+//                    return transform(this@toValueContainer, namespace)
+//                }
+//            }
+//        }
+
+        fun <T : ElementMapping, K : MappingIdentifier, N : MappingNode<K>> Collection<T>.toNodeContainer(
+            getId: (mapping: T, namespace: String) -> K?,
+            getNode: (MappingValueContainer<K>, T) -> N
+        ): MappingNodeContainer<K, N> {
+            return MappingNodeContainerImpl(
+                mapTo(HashSet()) { node ->
+                    val ids = namespaces
+                        .mapNotNull { namespace -> getId(node, namespace)?.let { node -> namespace to node } }
+                        .toMap()
+
+                    getNode(
+                        MappingValueContainerImpl(
+                            ids,
+                        ),
+                        node
+                    )
+                }
+            )
+        }
 
         return ArchiveMapping(
-             tree.classes.mapNotNull mapClasses@ {
-                ClassMapping(
-                    ClassIdentifier(
-                        it.getName("intermediary") ?: return@mapClasses null,
-                        MappingType.REAL
-                    ),
-                    ClassIdentifier(
-                        it.getName("official") ?: return@mapClasses null,
-                        MappingType.FAKE
-                    ),
-                    it.methods.mapNotNull mapMethods@ { m ->
-                        val intermediaryDesc = MethodSignature.of(m.getDesc("intermediary") ?: return@mapMethods null)
-                        val officialDesc = MethodSignature.of(m.getDesc("official") ?: return@mapMethods null)
-                        MethodMapping(
-                            MethodIdentifier(
-                                m.getName("intermediary") ?: return@mapMethods null,
-                                parameters(intermediaryDesc.desc)
-                                    .map(::fromInternalType),
-                                MappingType.REAL
-                            ),
-                            MethodIdentifier(
-                                m.getName("official") ?: return@mapMethods null,
-                                parameters(officialDesc.desc)
-                                    .map(::fromInternalType),
-                                MappingType.FAKE
-                            ),
-                            null, null, null, null,
-                            fromInternalType(intermediaryDesc.returnType!!),
-                            fromInternalType(officialDesc.returnType!!),
-                        )
-                    }.toBiMap(),
-                    it.fields.mapNotNull mapFields@ {f ->
-                        FieldMapping(
-                            FieldIdentifier(
-                                f.getName("intermediary") ?: return@mapFields null,
-                                MappingType.REAL,
-                            ),
-                            FieldIdentifier(
-                                f.getName("official") ?: return@mapFields null,
-                                MappingType.FAKE,
-                            ),
-                            fromInternalType(f.getDesc("intermediary") ?: return@mapFields null),
-                            fromInternalType(f.getDesc("official") ?: return@mapFields null),
-                        )
-                    }.toBiMap()
+            namespaces,
+            MappingValueContainerImpl(mapOf()),
+            tree.classes.toNodeContainer( getClassId@ { mapping, namespace ->
+                ClassIdentifier(
+                    mapping.getName(namespace) ?: return@getClassId null,
+                    namespace
                 )
-            }.toBiMap()
+            }) { cIds, it ->
+                ClassMapping(
+                    namespaces,
+                    cIds,
+                    it.methods.toNodeContainer(
+                        getMethodId@ { mapping, namespace ->
+                            val name = mapping.getName(namespace) ?: return@getMethodId null
+                            val desc= mapping.getDesc(namespace) ?: return@getMethodId null
+
+                            MethodIdentifier(
+                                name,
+                                parameters(MethodSignature.of(desc).desc).map {
+                                    fromInternalType(it)
+                                } ,
+                                namespace
+                            )
+                        }
+                    ) { mIds, m ->
+                        MethodMapping(
+                            namespaces,
+                            mIds,
+                            null, null,
+                            MappingValueContainerImpl(
+                                namespaces
+                                    .mapNotNull { n ->
+                                        m.getDesc(n)?.let {
+                                            n to it
+                                        }
+                                    }.associate { (namespace, desc) ->
+                                        namespace to fromInternalType(MethodSignature.of(desc).returnType!!)
+                                    }
+                            )
+                        )
+                    },
+                    it.fields.toNodeContainer( getFieldId@ { mapping, namespace ->
+                        FieldIdentifier(
+                            mapping.getName(namespace) ?: return@getFieldId null,
+                            namespace
+                        )
+                    }) { fIds, f ->
+                        FieldMapping(
+                           namespaces,
+                            fIds,
+                            MappingValueContainerImpl(
+                            namespaces.mapNotNull {
+                                f.getDesc(it)?.let { desc ->
+                                    it to desc
+                                }
+                            }.associate { (namespace, desc) ->
+                                namespace to fromInternalType(desc)
+                            })
+                        )
+                    }
+                )
+            }
         )
     }
 }

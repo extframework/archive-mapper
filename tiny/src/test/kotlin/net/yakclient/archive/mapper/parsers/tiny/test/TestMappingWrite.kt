@@ -18,7 +18,9 @@ class TestMappingWrite {
         val mappings = TinyV1MappingsParser.parse(`in`)
 
         val dir = Files.createTempDirectory("tiny-out")
-        write(Tiny1FileWriter(FileWriter((dir resolve "out.tiny").toFile())), mappings, "intermediary", "official")
+        write(Tiny1FileWriter(FileWriter((dir resolve "out.tiny").toFile())), mappings,
+            "official",
+            "intermediary")
         println(dir)
 
         TinyV1MappingsParser.parse((dir resolve "out.tiny").inputStream())

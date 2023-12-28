@@ -1,7 +1,6 @@
 package net.yakclient.archive.mapper.transform.test
 
-import net.yakclient.archive.mapper.parsers.ProGuardMappingParser
-import net.yakclient.archive.mapper.transform.MappingDirection
+import net.yakclient.archive.mapper.parsers.proguard.ProGuardMappingParser
 import net.yakclient.archive.mapper.transform.transformArchive
 import net.yakclient.archives.Archives
 import net.yakclient.common.util.resolve
@@ -32,8 +31,9 @@ class TestArchiveMapping {
         transformArchive(
             archive,
             childPaths.map { Archives.find(it, Archives.Finders.ZIP_FINDER) },
-            ProGuardMappingParser.parse(mappingsIn),
-            direction = MappingDirection.TO_REAL,
+            ProGuardMappingParser("official", "named").parse(mappingsIn),
+            "official",
+            "named",
         )
 
 

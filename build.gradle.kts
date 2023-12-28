@@ -9,9 +9,6 @@ tasks.wrapper {
     gradleVersion = "7.2"
 }
 
-dependencies {
-    implementation("net.yakclient:common-util:1.0-SNAPSHOT")
-}
 
 allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
@@ -19,7 +16,7 @@ allprojects {
     apply(plugin = "org.jetbrains.dokka")
 
     group = "net.yakclient"
-    version = "1.1-SNAPSHOT"
+    version = "1.2-SNAPSHOT"
 
     repositories {
         mavenCentral()
@@ -38,6 +35,8 @@ allprojects {
     }
 
     dependencies {
+        implementation("net.yakclient:common-util:1.0-SNAPSHOT")
+
         implementation(kotlin("stdlib"))
         implementation(kotlin("reflect"))
         testImplementation(kotlin("test"))

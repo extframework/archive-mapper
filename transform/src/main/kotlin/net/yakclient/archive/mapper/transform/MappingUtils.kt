@@ -2,31 +2,26 @@ package net.yakclient.archive.mapper.transform
 
 import net.yakclient.archive.mapper.*
 import net.yakclient.archive.mapper.PrimitiveTypeIdentifier.*
-import net.yakclient.archive.mapper.transform.MappingDirection.TO_FAKE
-import net.yakclient.archive.mapper.transform.MappingDirection.TO_REAL
 import net.yakclient.archives.extension.parameters
 import net.yakclient.archives.transform.ByteCodeUtils
 import net.yakclient.archives.transform.MethodSignature
 import org.objectweb.asm.signature.SignatureReader
 import org.objectweb.asm.signature.SignatureWriter
 
-public fun ArchiveMapping.getMappedClass(jvmName: String, direction: MappingDirection): ClassMapping? {
+public fun ArchiveMapping.getMappedClass(jvmName: String, fromNamespace: String): ClassMapping? {
     return classes[ClassIdentifier(
-        jvmName, direction.asOppositeType()
+        jvmName, fromNamespace
     )]
 }
 
-public fun ArchiveMapping.mapClassOrType(type: String, direction: MappingDirection) : String {
-    return mapClassName(type, direction)  ?: mapType(type, direction)
-}
+//public fun ArchiveMapping.mapClassOrType(type: String, fromNamespace: String) : String {
+//    return mapClassName(type, fromNamespace)  ?: mapType(type, fromNamespace)
+//}
 
-public fun ArchiveMapping.mapClassName(jvmName: String, direction: MappingDirection): String? {
-    val mappedClass = getMappedClass(jvmName, direction)
+public fun ArchiveMapping.mapClassName(jvmName: String, fromNamespace: String, toNamespace: String): String? {
+    val mappedClass = getMappedClass(jvmName, fromNamespace)
 
-    return when (direction) {
-        TO_REAL -> mappedClass?.realIdentifier
-        TO_FAKE -> mappedClass?.fakeIdentifier
-    }?.name
+    return mappedClass?.getIdentifier(toNamespace)?.name
 }
 
 //public fun ArchiveMapping.mapArray(jvmName: String, direction: MappingDirection) : String? {
@@ -41,19 +36,19 @@ public fun ArchiveMapping.mapClassName(jvmName: String, direction: MappingDirect
 //}
 // All expected to be in jvm class format. ie. org/example/MyClass
 // Maps the
-public fun ArchiveMapping.mapType(jvmType: String, direction: MappingDirection): String {
+public fun ArchiveMapping.mapType(jvmType: String, fromNamespace: String, toNamespace: String): String {
     return if (jvmType.isEmpty()) jvmType
     else if (ByteCodeUtils.isPrimitiveType(jvmType.first())) jvmType
     else if (jvmType.startsWith("[")) {
-        "[" + mapType(jvmType.substring(1 until jvmType.length), direction)
+        "[" + mapType(jvmType.substring(1 until jvmType.length), fromNamespace, toNamespace)
     } else {
         val jvmName = jvmType.removePrefix("L").removeSuffix(";")
-        val mapClassName = mapClassName(jvmName, direction) ?: jvmName
+        val mapClassName = mapClassName(jvmName, fromNamespace, toNamespace) ?: jvmName
         "L$mapClassName;"
     }
 }
 
-public fun ArchiveMapping.mapMethodDesc(desc: String, direction: MappingDirection): String {
+public fun ArchiveMapping.mapMethodDesc(desc: String, fromNamespace: String, toNamespace: String): String {
     val signature = MethodSignature.of(desc)
     val parameters = parameters(signature.desc)
 
@@ -62,21 +57,21 @@ public fun ArchiveMapping.mapMethodDesc(desc: String, direction: MappingDirectio
     return parameters.joinToString(
         separator = "",
         prefix = signature.name + "(",
-        postfix = ")" + (signature.returnType?.let { mapType(it, direction) } ?: ""),
+        postfix = ")" + (signature.returnType?.let { mapType(it, fromNamespace, toNamespace) } ?: ""),
         transform = {
-            mapType(it, direction)
+            mapType(it, fromNamespace, toNamespace)
         }
     )
 }
 
-public fun ArchiveMapping.mapAnySignature(signature: String, direction: MappingDirection): String {
+public fun ArchiveMapping.mapAnySignature(signature: String, fromNamespace: String, toNamespace: String): String {
     val visitor = object : SignatureWriter() {
         override fun visitClassType(name: String?) {
-            super.visitClassType(name?.let { mapClassName(it, direction) } ?: name)
+            super.visitClassType(name?.let { mapClassName(it, fromNamespace, toNamespace) } ?: name)
         }
 
         override fun visitInnerClassType(name: String?) {
-            super.visitInnerClassType(name?.let { mapClassName(it, direction) } ?: name)
+            super.visitInnerClassType(name?.let { mapClassName(it,fromNamespace, toNamespace) } ?: name)
         }
     }
     val reader = SignatureReader(signature)
@@ -108,8 +103,8 @@ public fun toTypeIdentifier(type: String): TypeIdentifier = when (type) {
     }
 }
 
-public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String, direction: MappingDirection): String? {
-    val clsMapping = getMappedClass(cls, direction)
+public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String, fromNamespace: String, toNamespace: String): String? {
+    val clsMapping = getMappedClass(cls, fromNamespace)
 
     val method = clsMapping?.methods?.get(
         MethodIdentifier(
@@ -117,36 +112,26 @@ public fun ArchiveMapping.mapMethodName(cls: String, name: String, desc: String,
             run {
                 parameters(MethodSignature.of(desc).desc)
             }.map(::toTypeIdentifier),
-            direction.asOppositeType()
+            fromNamespace
         )
     )
 
-    return when (direction) {
-        TO_REAL -> method?.realIdentifier
-        TO_FAKE -> method?.fakeIdentifier
-    }?.name
+    return method?.getIdentifier(toNamespace)?.name
 }
 
-public fun ArchiveMapping.mapFieldName(owner: String, name: String, direction: MappingDirection): String? {
-    val mappedClass = getMappedClass(owner, direction)
+public fun ArchiveMapping.mapFieldName(owner: String, name: String, fromNamespace: String, toNamespace: String): String? {
+    val mappedClass = getMappedClass(owner, fromNamespace)
         ?.fields
         ?.get(
             FieldIdentifier(
                 name,
-                direction.asOppositeType()
+                fromNamespace
             )
         )
 
-    return when (direction) {
-        TO_REAL -> mappedClass?.realIdentifier
-        TO_FAKE -> mappedClass?.fakeIdentifier
-    }?.name
+    return mappedClass?.getIdentifier(toNamespace)?.name
 }
 
-internal fun MappingDirection.asOppositeType(): MappingType = when (this) {
-    TO_REAL -> MappingType.FAKE
-    TO_FAKE -> MappingType.REAL
-}
 
 //public fun String.withSlashes(): String = replace('.', '/')
 //public fun String.withDots(): String = replace('/', '.')
