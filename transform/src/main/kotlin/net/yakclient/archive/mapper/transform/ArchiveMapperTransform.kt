@@ -22,10 +22,10 @@ private fun Any.fullPrint(): String {
     }
 }
 
-private fun TypeIdentifier.mostInnerClass(): String {
-    if (this is WrappedTypeIdentifier) return innerType.mostInnerClass()
-    return (this as ClassTypeIdentifier).fullQualifier
-}
+//private fun TypeIdentifier.mostInnerClass(): String {
+//    if (this is WrappedTypeIdentifier) return innerType.mostInnerClass()
+//    return (this as ClassTypeIdentifier).fullQualifier
+//}
 
 public fun mappingTransformConfigFor(
     mappings: ArchiveMapping,

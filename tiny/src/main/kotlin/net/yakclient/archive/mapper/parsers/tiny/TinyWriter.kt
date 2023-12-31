@@ -24,7 +24,7 @@ public fun <T> write(writer1: T, mappings: ArchiveMapping, srcNamespace: String,
 
             clazz.methods.values.forEach { method ->
                 writer.visitMethod(method.getIdentifier(srcNamespace)?.name,
-                    "(" + (method.getIdentifier(dstNamespace)?.parameters
+                    "(" + (method.getIdentifier(srcNamespace)?.parameters
                         ?: listOf()).joinToString(separator = "") {
                         it.descriptor
                     } + ")" + method.returnType[srcNamespace]!!.descriptor)
@@ -36,17 +36,20 @@ public fun <T> write(writer1: T, mappings: ArchiveMapping, srcNamespace: String,
                         it.descriptor
                     } + ")" + method.returnType[dstNamespace]!!.descriptor)
 
-                (method.getIdentifier(srcNamespace)?.parameters ?: listOf()).zip(
-                    method.getIdentifier(
-                        dstNamespace
-                    )?.parameters ?: listOf()
-                ).withIndex()
-                    .forEach { (i, pair) ->
-                        val (r, f) = pair
-                        writer.visitMethodArg(i, i, r.descriptor)
-                        writer.visitDstName(MappedElementKind.METHOD_ARG, 0, f.descriptor)
-                    }
                 writer.visitElementContent(MappedElementKind.METHOD)
+
+//                (method.getIdentifier(srcNamespace)?.parameters ?: listOf()).zip(
+//                    method.getIdentifier(
+//                        dstNamespace
+//                    )?.parameters ?: listOf()
+//                ).withIndex()
+//                    .forEach { (i, pair) ->
+//                        val (r, f) = pair
+//                        writer.visitMethodArg(i, i, r.descriptor)
+//                        writer.visitDstName(MappedElementKind.METHOD_ARG, 0, f.descriptor)
+//                        writer.visitElementContent(MappedElementKind.METHOD_ARG)
+//                    }
+
             }
 
             clazz.fields.values.forEach { field ->

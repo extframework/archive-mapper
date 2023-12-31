@@ -12,6 +12,7 @@ dependencies {
     implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 
     testImplementation(project(":proguard"))
+    testImplementation(project(":tiny"))
 }
 
 task<Jar>("sourcesJar") {
