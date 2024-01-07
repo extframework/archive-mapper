@@ -38,8 +38,6 @@ class TestArchiveMapping {
             "named",
         )
 
-
-
         val createTempFile = Files.createTempFile(UUID.randomUUID().toString(), ".jar")
         JarOutputStream(FileOutputStream(createTempFile.toFile())).use { target ->
             archive.reader.entries().forEach { e ->

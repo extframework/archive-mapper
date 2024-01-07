@@ -70,25 +70,25 @@ class TestTypeMapping {
 //
 //    }
 
-    public fun transformClass(
-        reader: ClassReader,
-        mappings: ArchiveMapping,
-        fromNamespace: String,
-        toNamespace: String,
-        writer: ClassWriter = ClassWriter(Archives.WRITER_FLAGS)
-    ): ByteArray {
-        return Archives.resolve(
-            reader,
-            mappingTransformConfigFor(mappings,fromNamespace, toNamespace,
-                listOf(
-                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeClass", null, listOf()),
-                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeException", null, listOf()),
-                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeSuperType", null, listOf()),
-                ).associateBy { it.name }
-            ),
-            writer
-        )
-    }
+//    public fun transformClass(
+//        reader: ClassReader,
+//        mappings: ArchiveMapping,
+//        fromNamespace: String,
+//        toNamespace: String,
+//        writer: ClassWriter = ClassWriter(Archives.WRITER_FLAGS)
+//    ): ByteArray {
+//        return Archives.resolve(
+//            reader,
+//            mappingTransformConfigFor(mappings,fromNamespace, toNamespace,
+//                listOf(
+//                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeClass", null, listOf()),
+//                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeException", null, listOf()),
+//                    ClassInheritancePath("net/yakclient/archive/mapper/transform/test/FakeSuperType", null, listOf()),
+//                ).associateBy { it.name }
+//            ),
+//            writer
+//        )
+//    }
 
 //    @Test
 //    fun `Test full class type map`() {

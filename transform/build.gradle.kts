@@ -1,7 +1,3 @@
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     implementation(project(":"))
     implementation("net.yakclient:archives:1.1-SNAPSHOT") {
