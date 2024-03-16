@@ -4,8 +4,8 @@ import net.fabricmc.mappingio.MappingVisitor
 import net.fabricmc.mappingio.tree.MappingTree.ElementMapping
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.yakclient.archive.mapper.*
-import net.yakclient.archives.extension.parameters
-import net.yakclient.archives.transform.MethodSignature
+import net.yakclient.archives.extension.Method
+import org.objectweb.asm.Type
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -58,7 +58,7 @@ public open class TinyMappingsParser(
         return ArchiveMapping(
             namespaces,
             MappingValueContainerImpl(mapOf()),
-            tree.classes.toNodeContainer( getClassId@ { mapping, namespace ->
+            tree.classes.toNodeContainer(getClassId@{ mapping, namespace ->
                 ClassIdentifier(
                     mapping.getName(namespace) ?: return@getClassId null,
                     namespace
@@ -68,15 +68,13 @@ public open class TinyMappingsParser(
                     namespaces,
                     cIds,
                     it.methods.toNodeContainer(
-                        getMethodId@ { mapping, namespace ->
+                        getMethodId@{ mapping, namespace ->
                             val name = mapping.getName(namespace) ?: return@getMethodId null
-                            val desc= mapping.getDesc(namespace) ?: return@getMethodId null
+                            val desc = mapping.getDesc(namespace) ?: return@getMethodId null
 
                             MethodIdentifier(
                                 name,
-                                parameters(MethodSignature.of(desc).desc).map {
-                                    fromInternalType(it)
-                                } ,
+                                Method(desc).argumentTypes.toList(),
                                 namespace
                             )
                         }
@@ -92,28 +90,28 @@ public open class TinyMappingsParser(
                                             n to it
                                         }
                                     }.associate { (namespace, desc) ->
-                                        namespace to fromInternalType(MethodSignature.of(desc).returnType!!)
+                                        namespace to Method(desc).returnType!!
                                     }
                             )
                         )
                     },
-                    it.fields.toNodeContainer( getFieldId@ { mapping, namespace ->
+                    it.fields.toNodeContainer(getFieldId@{ mapping, namespace ->
                         FieldIdentifier(
                             mapping.getName(namespace) ?: return@getFieldId null,
                             namespace
                         )
                     }) { fIds, f ->
                         FieldMapping(
-                           namespaces,
+                            namespaces,
                             fIds,
                             MappingValueContainerImpl(
-                            namespaces.mapNotNull {
-                                f.getDesc(it)?.let { desc ->
-                                    it to desc
-                                }
-                            }.associate { (namespace, desc) ->
-                                namespace to fromInternalType(desc)
-                            })
+                                namespaces.mapNotNull {
+                                    f.getDesc(it)?.let { desc ->
+                                        it to desc
+                                    }
+                                }.associate { (namespace, desc) ->
+                                    namespace to Type.getType(desc)
+                                })
                         )
                     }
                 )

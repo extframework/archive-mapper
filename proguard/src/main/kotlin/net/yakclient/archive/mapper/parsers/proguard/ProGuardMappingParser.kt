@@ -2,6 +2,8 @@ package net.yakclient.archive.mapper.parsers.proguard
 
 import net.yakclient.archive.mapper.*
 import net.yakclient.common.util.readInputStream
+import org.objectweb.asm.Type
+import org.objectweb.asm.commons.Remapper
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -98,13 +100,22 @@ public class ProGuardMappingParser(
                     // Update the line
                     line = reader.readLine().trim() // Read a new line
 
-                    fun obfuscatedIdentifier(type: TypeIdentifier): TypeIdentifier {
-                        if (type is WrappedTypeIdentifier) return type.withNew(obfuscatedIdentifier(type.innerType))
+                    fun obfuscatedIdentifier(type: Type): Type {
 
-                        if (type !is ClassTypeIdentifier) return type
-                        val fullQualifier = typeMappings[type.fullQualifier]
+                        if (type.sort == Type.ARRAY) return Type.getType(
+                            "[" + obfuscatedIdentifier(
+                                Type.getType(
+                                    type.descriptor.removePrefix(
+                                        "["
+                                    )
+                                )
+                            )
+                        )
 
-                        return if (fullQualifier != null) ClassTypeIdentifier(
+                        if (type.sort != Type.OBJECT) return type
+                        val fullQualifier = typeMappings[type.internalName]
+
+                        return if (fullQualifier != null) classToType(
                             fullQualifier
                         ) else type
                     }
@@ -114,7 +125,7 @@ public class ProGuardMappingParser(
                         // Get the result of this line, we know the match is not null due to the check above
                         val result = methodMatcher.matchEntire(line)!!.groups as MatchNamedGroupCollection
 
-                        val realParameters: List<TypeIdentifier> =
+                        val realParameters: List<Type> =
                             if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(
                                 ','
                             ).map(::toTypeIdentifier)
@@ -249,22 +260,24 @@ public class ProGuardMappingParser(
         }
     }
 
-    private fun toTypeIdentifier(desc: String): TypeIdentifier = when (desc) {
-        "boolean" -> PrimitiveTypeIdentifier.BOOLEAN
-        "char" -> PrimitiveTypeIdentifier.CHAR
-        "byte" -> PrimitiveTypeIdentifier.BYTE
-        "short" -> PrimitiveTypeIdentifier.SHORT
-        "int" -> PrimitiveTypeIdentifier.INT
-        "float" -> PrimitiveTypeIdentifier.FLOAT
-        "long" -> PrimitiveTypeIdentifier.LONG
-        "double" -> PrimitiveTypeIdentifier.DOUBLE
-        "void" -> PrimitiveTypeIdentifier.VOID
+    private fun toTypeIdentifier(desc: String): Type = when (desc) {
+        "boolean" -> Type.BOOLEAN_TYPE
+        "char" -> Type.CHAR_TYPE
+        "byte" -> Type.BYTE_TYPE
+        "short" -> Type.SHORT_TYPE
+        "int" -> Type.INT_TYPE
+        "float" -> Type.FLOAT_TYPE
+        "long" -> Type.LONG_TYPE
+        "double" -> Type.DOUBLE_TYPE
+        "void" -> Type.VOID_TYPE
         else -> {
             if (desc.endsWith("[]")) {
                 val type = desc.removeSuffix("[]")
 
-                ArrayTypeIdentifier(toTypeIdentifier(type))
-            } else ClassTypeIdentifier(desc.replace('.', '/'))
+                Type.getType("[" + toTypeIdentifier(type).descriptor)
+            } else classToType(desc.replace('.', '/'))
         }
     }
 }
+
+private fun classToType(cls: String) : Type = Type.getType("L$cls;")

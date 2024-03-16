@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":"))
+    implementation("org.ow2.asm:asm-commons:9.6")
 }
 
 

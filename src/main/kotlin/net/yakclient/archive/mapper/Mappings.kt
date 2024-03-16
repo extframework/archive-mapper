@@ -1,5 +1,7 @@
 package net.yakclient.archive.mapper
 
+import org.objectweb.asm.Type
+
 public data class ArchiveMapping(
     override val namespaces: Set<String>,
     override val identifiers: MappingValueContainer< ArchiveIdentifier>,
@@ -41,18 +43,18 @@ public data class MethodMapping(
     public val lnStart: MappingValueContainer<Int>?,
     public val lnEnd: MappingValueContainer<Int>?,
 
-    public val returnType: MappingValueContainer<TypeIdentifier>,
+    public val returnType: MappingValueContainer<Type>,
 ) : MappingNode<MethodIdentifier>
 
 public data class MethodIdentifier(
-    override val name: String, val parameters: List<TypeIdentifier>, override val namespace: String
+    override val name: String, val parameters: List<Type>, override val namespace: String
 ) : MappingIdentifier
 
 public data class FieldMapping(
     override val namespaces: Set<String>,
     override val identifiers: MappingValueContainer< FieldIdentifier>,
 
-    public val type: MappingValueContainer<TypeIdentifier>
+    public val type: MappingValueContainer<Type>
 ) : MappingNode<FieldIdentifier>
 
 public data class FieldIdentifier(

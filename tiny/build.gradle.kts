@@ -7,12 +7,10 @@ repositories {
 
 dependencies {
     implementation(project(":"))
-    implementation("net.yakclient:archives:1.1-SNAPSHOT") {
+    implementation("net.yakclient:archives:1.2-SNAPSHOT") {
         isChanging = true
     }
     implementation("net.fabricmc:mapping-io:0.5.0")
-
-    implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 }
 
 task<Jar>("sourcesJar") {

@@ -37,19 +37,6 @@ public fun <T> write(writer1: T, mappings: ArchiveMapping, srcNamespace: String,
                     } + ")" + method.returnType[dstNamespace]!!.descriptor)
 
                 writer.visitElementContent(MappedElementKind.METHOD)
-
-//                (method.getIdentifier(srcNamespace)?.parameters ?: listOf()).zip(
-//                    method.getIdentifier(
-//                        dstNamespace
-//                    )?.parameters ?: listOf()
-//                ).withIndex()
-//                    .forEach { (i, pair) ->
-//                        val (r, f) = pair
-//                        writer.visitMethodArg(i, i, r.descriptor)
-//                        writer.visitDstName(MappedElementKind.METHOD_ARG, 0, f.descriptor)
-//                        writer.visitElementContent(MappedElementKind.METHOD_ARG)
-//                    }
-
             }
 
             clazz.fields.values.forEach { field ->

@@ -1,11 +1,9 @@
 dependencies {
     implementation(project(":"))
-    implementation("net.yakclient:archives:1.1-SNAPSHOT") {
+    implementation("net.yakclient:archives:1.2-SNAPSHOT") {
         isChanging = true
     }
     implementation("org.ow2.asm:asm-commons:9.6")
-
-    implementation("net.yakclient:common-util:1.0-SNAPSHOT")
 
     testImplementation(project(":proguard"))
     testImplementation(project(":tiny"))

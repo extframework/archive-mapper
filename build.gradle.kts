@@ -10,6 +10,10 @@ tasks.wrapper {
 }
 
 
+dependencies {
+    implementation("org.ow2.asm:asm-commons:9.6")
+}
+
 allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "maven-publish")
@@ -35,7 +39,7 @@ allprojects {
     }
 
     dependencies {
-        implementation("net.yakclient:common-util:1.0-SNAPSHOT")
+        implementation("net.yakclient:common-util:1.1-SNAPSHOT")
 
         implementation(kotlin("stdlib"))
         implementation(kotlin("reflect"))

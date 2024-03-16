@@ -2,6 +2,7 @@ package net.yakclient.archive.mapper.parsers.proguard.test
 
 import net.yakclient.archive.mapper.*
 import net.yakclient.archive.mapper.parsers.proguard.ProGuardMappingParser
+import org.objectweb.asm.Type
 import java.net.URI
 import kotlin.test.Test
 
@@ -54,32 +55,6 @@ class ProGuardParserTest {
         assert(result[3] == "f")
     }
 
-    @Test
-    fun `Test type descriptor conversion`() {
-        fun toTypeDescriptor(desc: String): TypeIdentifier = when (desc) {
-            "boolean" -> PrimitiveTypeIdentifier.BOOLEAN
-            "char" -> PrimitiveTypeIdentifier.CHAR
-            "byte" -> PrimitiveTypeIdentifier.BYTE
-            "short" -> PrimitiveTypeIdentifier.SHORT
-            "int" -> PrimitiveTypeIdentifier.INT
-            "float" -> PrimitiveTypeIdentifier.FLOAT
-            "long" -> PrimitiveTypeIdentifier.LONG
-            "double" -> PrimitiveTypeIdentifier.DOUBLE
-            "void" -> PrimitiveTypeIdentifier.VOID
-            else -> {
-                if (desc.endsWith("[]")) {
-                    val type = desc.removeSuffix("[]")
-
-                    ArrayTypeIdentifier(toTypeDescriptor(type))
-                } else ClassTypeIdentifier(desc)
-            }
-        }
-
-        println(toTypeDescriptor("int[][][]").descriptor)
-        println(toTypeDescriptor("java.lang.String[][][]").descriptor)
-        println(toTypeDescriptor("long").descriptor)
-        println(toTypeDescriptor("net.yakclient.Something").descriptor)
-    }
 
     @Test
     fun `Test Pro Guard Parsing`() {
@@ -104,10 +79,10 @@ class ProGuardParserTest {
         val method = title.methods.get(MethodIdentifier(
             "a",
             listOf(
-                ClassTypeIdentifier("dtm"),
-                PrimitiveTypeIdentifier.INT,
-                PrimitiveTypeIdentifier.INT,
-                PrimitiveTypeIdentifier.FLOAT
+                Type.getType("Ldtm;"),
+                Type.INT_TYPE,
+                Type.INT_TYPE,
+                Type.FLOAT_TYPE
             ),
             "official"
         ))

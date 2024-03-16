@@ -1,5 +1,6 @@
 package net.yakclient.archive.mapper.transform.test
 
+import com.durganmcbroom.resources.openStream
 import net.yakclient.archive.mapper.parsers.proguard.ProGuardMappingParser
 import net.yakclient.archive.mapper.parsers.tiny.TinyV1MappingsParser
 import net.yakclient.archive.mapper.transform.transformArchive
@@ -45,7 +46,7 @@ class TestArchiveMapping {
 
                 target.putNextEntry(entry)
 
-                val eIn = e.resource.open()
+                val eIn = e.resource.openStream()
 
                 //Stolen from https://stackoverflow.com/questions/1281229/how-to-use-jaroutputstream-to-create-a-jar-file
                 val buffer = ByteArray(1024)
@@ -97,7 +98,7 @@ class TestArchiveMapping {
 
                 target.putNextEntry(entry)
 
-                val eIn = e.resource.open()
+                val eIn = e.resource.openStream()
 
                 //Stolen from https://stackoverflow.com/questions/1281229/how-to-use-jaroutputstream-to-create-a-jar-file
                 val buffer = ByteArray(1024)
