@@ -1,33 +1,44 @@
+import dev.extframework.gradle.common.commonUtil
+import dev.extframework.gradle.common.extFramework
+
 plugins {
     kotlin("jvm") version "1.9.21"
 
-    id("maven-publish")
-    id("org.jetbrains.dokka") version "1.9.10"
+    id("dev.extframework.common") version "1.0.3"
 }
 
 tasks.wrapper {
     gradleVersion = "7.2"
 }
 
-
 dependencies {
     implementation("org.ow2.asm:asm-commons:9.6")
 }
 
-allprojects {
-    apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "maven-publish")
-    apply(plugin = "org.jetbrains.dokka")
+common {
+    publishing {
+        publication {
+            artifactId = "archive-mapper"
 
-    group = "net.yakclient"
+            commonPom {
+                name.set("Archive Mapper")
+                description.set("A mapping parser for de-obfuscation mappings(proguard)")
+                url.set("https://github.com/yakclient/archive-mapper")
+            }
+        }
+    }
+}
+
+allprojects {
+    apply(plugin = "dev.extframework.common")
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+
+    group = "dev.extframework"
     version = "1.2.1-SNAPSHOT"
 
     repositories {
         mavenCentral()
-        maven {
-            isAllowInsecureProtocol = true
-            url = uri("http://maven.yakclient.net/snapshots")
-        }
+        extFramework()
     }
 
     configurations.all {
@@ -39,109 +50,36 @@ allprojects {
     }
 
     dependencies {
-        implementation("net.yakclient:common-util:1.1-SNAPSHOT")
+        commonUtil()
 
         implementation(kotlin("stdlib"))
         implementation(kotlin("reflect"))
         testImplementation(kotlin("test"))
     }
 
-    tasks.compileKotlin {
-        destinationDirectory.set(tasks.compileJava.get().destinationDirectory.asFile.get())
+    common {
+        defaultJavaSettings()
 
-        kotlinOptions {
-            jvmTarget = "17"
-        }
-    }
+        publishing {
+            publication {
+                publication {
+                    withJava()
+                    withSources()
+                    withDokka()
 
-    tasks.compileTestKotlin {
-        kotlinOptions {
-            jvmTarget = "17"
-        }
-    }
+                    commonPom {
+                        packaging = "jar"
 
-    tasks.test {
-        useJUnitPlatform()
-    }
+                        withExtFrameworkRepo()
 
-    tasks.compileJava {
-        targetCompatibility = "17"
-        sourceCompatibility = "17"
-    }
-
-    publishing {
-        repositories {
-            if (project.hasProperty("maven-user") && project.hasProperty("maven-secret")) maven {
-                logger.quiet("Maven user and password found.")
-                val repo = if ((version as String).endsWith("-SNAPSHOT")) "snapshots" else "releases"
-
-                isAllowInsecureProtocol = true
-
-                url = uri("http://maven.yakclient.net/$repo")
-                println(url)
-
-                credentials {
-                    username = project.findProperty("maven-user") as String
-                    password = project.findProperty("maven-secret") as String
-                }
-                authentication {
-                    create<BasicAuthentication>("basic")
-                }
-            } else logger.quiet("Maven user and password not found.")
-        }
-    }
-}
-
-task<Jar>("sourcesJar") {
-    archiveClassifier.set("sources")
-    from(sourceSets.main.get().allSource)
-}
-
-task<Jar>("javadocJar") {
-    archiveClassifier.set("javadoc")
-    from(tasks.dokkaJavadoc)
-}
-publishing {
-    publications {
-        create<MavenPublication>("archive-mapper-maven") {
-            from(components["java"])
-            artifact(tasks["sourcesJar"])
-            artifact(tasks["javadocJar"])
-
-            artifactId = "archive-mapper"
-
-            pom {
-                name.set("Archive Mapper")
-                description.set("A mapping parser for de-obfuscation mappings(proguard)")
-                url.set("https://github.com/yakclient/archive-mapper")
-
-                packaging = "jar"
-
-                withXml {
-                    val repositoriesNode = asNode().appendNode("repositories")
-                    val yakclientRepositoryNode = repositoriesNode.appendNode("repository")
-                    yakclientRepositoryNode.appendNode("id", "yakclient")
-                    yakclientRepositoryNode.appendNode("url", "http://maven.yakclient.net/snapshots")
-                }
-
-                developers {
-                    developer {
-                        name.set("Durgan McBroom")
+                        defaultDevelopers()
+                        gnuLicense()
+                        extFrameworkScm("archive-mapper")
                     }
                 }
-
-                licenses {
-                    license {
-                        name.set("GNU General Public License")
-                        url.set("https://opensource.org/licenses/gpl-license")
-                    }
-                }
-
-                scm {
-                    connection.set("scm:git:git://github.com/yakclient/archive-mapper")
-                    developerConnection.set("scm:git:ssh://github.com:yakclient/archive-mapper.git")
-                    url.set("https://github.com/yakclient/archive-mapper")
-                }
+            }
+            repositories {
+                extFramework(credentials = propertyCredentialProvider)
             }
         }
     }

@@ -1,1 +1,1 @@
-net.yakclient.archive.mapper.parsers.ProGuardMappingParser
+dev.extframework.archive.mapper.parsers.ProGuardMappingParser
