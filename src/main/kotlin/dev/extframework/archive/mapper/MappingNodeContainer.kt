@@ -15,9 +15,7 @@ public interface MappingValueContainer<out K> {
     public operator fun get(namespace: String): K?
 }
 
-// Impl
-
-public class MappingNodeContainerImpl<T : MappingIdentifier, out N : MappingNode<T>>(
+public data class MappingNodeContainerImpl<T : MappingIdentifier, out N : MappingNode<T>>(
     override val values: Set<N>
 ) : MappingNodeContainer<T, N> {
     private val namespaceMap: Map<String, Map<T, N>> = values
@@ -37,11 +35,10 @@ public class MappingNodeContainerImpl<T : MappingIdentifier, out N : MappingNode
     }
 }
 
-public class MappingValueContainerImpl<out K>(
+public data class MappingValueContainerImpl<out K>(
     private val values: Map<String, K>
 ) : MappingValueContainer<K> {
     override fun get(namespace: String): K? {
         return values[namespace]
     }
-
 }

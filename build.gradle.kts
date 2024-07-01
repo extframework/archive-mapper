@@ -13,6 +13,10 @@ tasks.wrapper {
 
 dependencies {
     implementation("org.ow2.asm:asm-commons:9.6")
+
+    testImplementation(project(":tiny"))
+    testImplementation(project(":proguard"))
+
 }
 
 common {

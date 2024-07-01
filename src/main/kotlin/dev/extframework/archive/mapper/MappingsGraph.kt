@@ -161,7 +161,7 @@ public fun joinMappings(path: List<DirectedMappingNode<ArchiveMapping>>): Archiv
             .mapTo(HashSet()) { fromClassIdentifier: ClassIdentifier ->
                 val (classes, toClassIdentifier: ClassIdentifier) = path.foldingMap(fromClassIdentifier) { acc, it ->
                     val node = it.node.classes[acc]
-                        ?: throw IllegalStateException("Failed to follow reference chain from ${fromClassIdentifier.namespace} class: '${fromClassIdentifier.name}' to appropriate remapping.")
+                        ?: throw IllegalStateException("Failed to follow reference chain from $fromNS to $toNS in class: '${fromClassIdentifier.name}' to appropriate remapping.")
 
                     DirectedMappingNode(
                         it.from, it.to, node
