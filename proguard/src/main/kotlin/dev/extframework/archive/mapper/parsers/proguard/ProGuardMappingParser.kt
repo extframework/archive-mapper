@@ -71,17 +71,16 @@ public class ProGuardMappingParser(
 
             // Read the first line
             var line: String = reader.readLine().trim()
-            var oneMore = true // To make sure we get the last line
 
             // Start reading lines
-            while (reader.ready() || oneMore.also { oneMore = false }) {
+            while (reader.ready()) {
                 // Match for a class
                 val gv = classMatcher.matchEntire(line)?.groupValues
 
                 // Check if the result is null, if so read the next line and continue.
                 if (gv == null) {
                     // Read a new line so we aren't stuck reading the same line forever.
-                    line = reader.readLine().trim()
+                    line = reader.readLine()?.trim() ?: break // Lines are done being read
 
                     continue
                 }
@@ -279,4 +278,4 @@ public class ProGuardMappingParser(
     }
 }
 
-private fun classToType(cls: String) : Type = Type.getType("L$cls;")
+private fun classToType(cls: String): Type = Type.getType("L$cls;")
