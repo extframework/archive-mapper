@@ -13,18 +13,22 @@ private const val METHOD_REGEX =
     """^((?<from>\d+):(?<to>\d+):)?(?<ret>[^:]+)\s(?<name>[^:]+)\((?<args>.*)\)((:(?<obfFrom>\d+))?(:(?<obfTo>\d+))?)?\s->\s(?<obf>[^:]+)"""
 private const val FIELD_REGEX = """^(\S+) (\S+) -> (\S+)$"""
 
-
 public class ProGuardMappingParser(
     private val obfuscated: String,
     private val deObfuscated: String
 ) : MappingParser {
-    private val classMatcher = Regex(dev.extframework.archive.mapper.parsers.proguard.CLASS_REGEX)
-    private val methodMatcher = Regex(dev.extframework.archive.mapper.parsers.proguard.METHOD_REGEX)
-    private val fieldMatcher = Regex(dev.extframework.archive.mapper.parsers.proguard.FIELD_REGEX)
+    private val classMatcher = Regex(CLASS_REGEX)
+    private val methodMatcher = Regex(METHOD_REGEX)
+    private val fieldMatcher = Regex(FIELD_REGEX)
 
     private val namespaces = setOf(obfuscated, deObfuscated)
 
     override val name: String = "proguard"
+
+    private data class CurrentClass(
+        val realName: String,
+        val fakeName: String
+    )
 
     override fun parse(mappingsIn: InputStream): ArchiveMapping {
         val bytes = mappingsIn.readInputStream()
@@ -54,11 +58,6 @@ public class ProGuardMappingParser(
         }
 
         BufferedReader(InputStreamReader(ByteArrayInputStream(bytes))).use { reader ->
-            // Converts a list to an ObfuscationMap
-            fun <I : MappingIdentifier, T : MappingNode<I>> Set<T>.toMappingNodeContainer(): MappingNodeContainer<I, T> {
-                return MappingNodeContainerImpl(this)
-            }
-
             // List of classes in archive.
             val classes = HashSet<ClassMapping>()
 
@@ -69,185 +68,47 @@ public class ProGuardMappingParser(
                 MappingNodeContainerImpl(setOf())
             )
 
-            // Read the first line
-            var line: String = reader.readLine().trim()
+            var line: String
+
+            var currClass: CurrentClass? = null
+
+            var methods = HashSet<MethodMapping>()
+            var fields = HashSet<FieldMapping>()
 
             // Start reading lines
-            while (reader.ready()) {
-                // Match for a class
-                val gv = classMatcher.matchEntire(line)?.groupValues
+            while (true) {
+                line = reader.readLine()?.trim() ?: break
 
-                // Check if the result is null, if so read the next line and continue.
-                if (gv == null) {
-                    // Read a new line so we aren't stuck reading the same line forever.
-                    line = reader.readLine()?.trim() ?: break // Lines are done being read
+                if (classMatcher.matches(line)) {
+                    val (_, real, fake) = classMatcher.matchEntire(line)!!.groupValues
 
+                    if (currClass != null) {
+                        classes.add(parseClass(currClass, methods, fields))
+                    }
+
+                    currClass = CurrentClass(real, fake)
+                    methods = HashSet()
+                    fields = HashSet()
+                } else if (methodMatcher.matches(line)) {
+                    methods.add(parseMethod(line, typeMappings))
+                }
+                // Else, if the current line is a field
+                else if (fieldMatcher.matches(line)) {
+                    // Again, match and get group values
+
+                    fields.add(parseField(line, typeMappings))
+                }
+                // Else, if the current line is source file attribute
+                else if (line.startsWith("#")) {
                     continue
                 }
-
-                // Now that we have a class, get the real and fake names
-                val (_, realName, fakeName) = gv
-
-                // List of methods in class
-                val methods = HashSet<MethodMapping>()
-                // List of fields in class
-                val fields = HashSet<FieldMapping>()
-
-                // Start reading lines
-                innerreader@ while (reader.ready()) {
-                    // Update the line
-                    line = reader.readLine().trim() // Read a new line
-
-                    fun obfuscatedIdentifier(type: Type): Type {
-
-                        if (type.sort == Type.ARRAY) return Type.getType(
-                            "[" + obfuscatedIdentifier(
-                                Type.getType(
-                                    type.descriptor.removePrefix(
-                                        "["
-                                    )
-                                )
-                            )
-                        )
-
-                        if (type.sort != Type.OBJECT) return type
-                        val fullQualifier = typeMappings[type.internalName]
-
-                        return if (fullQualifier != null) dev.extframework.archive.mapper.parsers.proguard.classToType(
-                            fullQualifier
-                        ) else type
-                    }
-
-                    // Check if the current line matched is a method definition
-                    if (methodMatcher.matches(line)) {
-                        // Get the result of this line, we know the match is not null due to the check above
-                        val result = methodMatcher.matchEntire(line)!!.groups as MatchNamedGroupCollection
-
-                        val realParameters: List<Type> =
-                            if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(
-                                ','
-                            ).map(::toTypeIdentifier)
-
-                        // Read the groups, map the types, and add a method node to the methods
-                        val realReturnType = toTypeIdentifier(result["ret"]!!.value)
-
-                        methods.add(
-                            MethodMapping(
-                                // Namespaces
-                                namespaces,
-                                // Identifiers
-                                MappingValueContainerImpl(
-                                    mapOf(
-                                        deObfuscated to MethodIdentifier(
-                                            result["name"]!!.value,
-                                            realParameters,
-                                            deObfuscated
-                                        ),
-                                        obfuscated to MethodIdentifier(
-                                            result["obf"]!!.value,
-                                            realParameters.map(::obfuscatedIdentifier),
-                                            obfuscated
-                                        )
-                                    )
-                                ),
-                                // Line numbers
-                                lnStart = run {
-                                    val deFrom = result["from"]?.value?.toIntOrNull()
-                                    val obfFrom = result["obfFrom"]?.value?.toIntOrNull()
-
-                                    if (deFrom == null || obfFrom == null) return@run null
-
-                                    MappingValueContainerImpl(
-                                        mapOf(
-                                            deObfuscated to deFrom,
-                                            obfuscated to obfFrom
-                                        )
-                                    )
-                                },
-                                lnEnd = run {
-                                    val deTo = result["to"]?.value?.toIntOrNull()
-                                    val obfTo = result["obfTo"]?.value?.toIntOrNull()
-                                    if (deTo == null || obfTo == null) return@run null // Not clever, but is nice for the compiler
-
-                                    MappingValueContainerImpl(
-                                        mapOf(
-                                            deObfuscated to deTo,
-                                            obfuscated to obfTo
-                                        )
-                                    )
-                                },
-                                // Parameters
-                                returnType = MappingValueContainerImpl(
-                                    mapOf(
-                                        deObfuscated to realReturnType,
-                                        obfuscated to obfuscatedIdentifier(realReturnType)
-                                    )
-                                ),
-                            )
-                        )
-                    }
-                    // Else, if the current line is a field
-                    else if (fieldMatcher.matches(line)) {
-                        // Again, match and get group values
-                        val result = fieldMatcher.matchEntire(line)!!.groupValues
-
-                        // Create a mapped field and add to the fields list
-                        val realType = toTypeIdentifier(result[1])
-                        fields.add(
-                            FieldMapping(
-                                namespaces,
-
-                                // TODO replace with named regex params
-                                MappingValueContainerImpl(
-                                    mapOf(
-                                        deObfuscated to FieldIdentifier(
-                                            result[2],
-                                            deObfuscated
-                                        ),
-                                        obfuscated to FieldIdentifier(
-                                            result[3],
-                                            obfuscated
-                                        )
-                                    )
-                                ),
-                                MappingValueContainerImpl(
-                                    mapOf(
-                                        deObfuscated to realType,
-                                        obfuscated to obfuscatedIdentifier(realType)
-                                    )
-                                )
-                            )
-                        )
-                    }
-                    // Else, if the current line is source file attribute
-                    else if (line.startsWith("#")) {
-                        continue@innerreader
-                    }
-                    // If its not a field or method, then the class definition is over, and we can break.
-                    else break@innerreader
-                }
-
-                // Method and field reading is done, create a mapped class and add it to the classes list.
-                classes.add(
-                    ClassMapping(
-                        namespaces,
-                        MappingValueContainerImpl(
-                            mapOf(
-                                deObfuscated to ClassIdentifier(
-                                    realName.replace('.', '/'),
-                                    deObfuscated
-                                ),
-                                obfuscated to ClassIdentifier(
-                                    fakeName.replace('.', '/'),
-                                    obfuscated,
-                                )
-                            )
-                        ),
-                        methods.toMappingNodeContainer(),
-                        fields.toMappingNodeContainer()
-                    )
-                )
             }
+
+            if (currClass != null) classes.add(
+                parseClass(
+                    currClass, methods, fields
+                )
+            )
 
             // All classes read, can create a mapped archive and return.
             return ArchiveMapping(
@@ -256,6 +117,153 @@ public class ProGuardMappingParser(
                 classes.toMappingNodeContainer()
             )
         }
+    }
+
+    private fun <I : MappingIdentifier, T : MappingNode<I>> Set<T>.toMappingNodeContainer(): MappingNodeContainer<I, T> {
+        return MappingNodeContainerImpl(this)
+    }
+
+    private fun parseClass(
+        currClass: CurrentClass,
+        methods: Set<MethodMapping>,
+        fields: Set<FieldMapping>
+    ) = ClassMapping(
+        namespaces,
+        MappingValueContainerImpl(
+            mapOf(
+                deObfuscated to ClassIdentifier(
+                    currClass.realName.replace('.', '/'),
+                    deObfuscated
+                ),
+                obfuscated to ClassIdentifier(
+                    currClass.fakeName.replace('.', '/'),
+                    obfuscated,
+                )
+            )
+        ),
+        methods.toMappingNodeContainer(),
+        fields.toMappingNodeContainer()
+    )
+
+    private fun obfuscatedIdentifier(type: Type, typeMappings: Map<String, String>): Type {
+        if (type.sort == Type.ARRAY) return Type.getType(
+            "[" + obfuscatedIdentifier(
+                Type.getType(
+                    type.descriptor.removePrefix(
+                        "["
+                    ),
+                ),
+                typeMappings
+            )
+        )
+
+        if (type.sort != Type.OBJECT) return type
+        val fullQualifier = typeMappings[type.internalName]
+
+        return if (fullQualifier != null) classToType(
+            fullQualifier
+        ) else type
+    }
+
+    private fun parseField(
+        line: String,
+        typeMappings: MutableMap<String, String>
+    ): FieldMapping {
+        val result = fieldMatcher.matchEntire(line)!!.groupValues
+
+        // Create a mapped field and add to the fields list
+        val realType = toTypeIdentifier(result[1])
+        return FieldMapping(
+            namespaces,
+
+            // TODO replace with named regex params
+            MappingValueContainerImpl(
+                mapOf(
+                    deObfuscated to FieldIdentifier(
+                        result[2],
+                        deObfuscated
+                    ),
+                    obfuscated to FieldIdentifier(
+                        result[3],
+                        obfuscated
+                    )
+                )
+            ),
+            MappingValueContainerImpl(
+                mapOf(
+                    deObfuscated to realType,
+                    obfuscated to obfuscatedIdentifier(realType, typeMappings)
+                )
+            )
+        )
+    }
+
+    private fun parseMethod(
+        line: String,
+        typeMappings: MutableMap<String, String>
+    ): MethodMapping {
+        val result = methodMatcher.matchEntire(line)!!.groups
+
+        val realParameters: List<Type> =
+            if (result["args"]?.value.isNullOrEmpty()) emptyList() else result["args"]!!.value.split(
+                ','
+            ).map(::toTypeIdentifier)
+
+        // Read the groups, map the types, and add a method node to the methods
+        val realReturnType = toTypeIdentifier(result["ret"]!!.value)
+
+        return MethodMapping(
+            // Namespaces
+            namespaces,
+            // Identifiers
+            MappingValueContainerImpl(
+                mapOf(
+                    deObfuscated to MethodIdentifier(
+                        result["name"]!!.value,
+                        realParameters,
+                        deObfuscated
+                    ),
+                    obfuscated to MethodIdentifier(
+                        result["obf"]!!.value,
+                        realParameters.map { obfuscatedIdentifier(it, typeMappings) },
+                        obfuscated
+                    )
+                )
+            ),
+            // Line numbers
+            lnStart = run {
+                val deFrom = result["from"]?.value?.toIntOrNull()
+                val obfFrom = result["obfFrom"]?.value?.toIntOrNull()
+
+                if (deFrom == null || obfFrom == null) return@run null
+
+                MappingValueContainerImpl(
+                    mapOf(
+                        deObfuscated to deFrom,
+                        obfuscated to obfFrom
+                    )
+                )
+            },
+            lnEnd = run {
+                val deTo = result["to"]?.value?.toIntOrNull()
+                val obfTo = result["obfTo"]?.value?.toIntOrNull()
+                if (deTo == null || obfTo == null) return@run null // Not clever, but is nice for the compiler
+
+                MappingValueContainerImpl(
+                    mapOf(
+                        deObfuscated to deTo,
+                        obfuscated to obfTo
+                    )
+                )
+            },
+            // Parameters
+            returnType = MappingValueContainerImpl(
+                mapOf(
+                    deObfuscated to realReturnType,
+                    obfuscated to obfuscatedIdentifier(realReturnType, typeMappings)
+                )
+            ),
+        )
     }
 
     private fun toTypeIdentifier(desc: String): Type = when (desc) {
@@ -273,7 +281,7 @@ public class ProGuardMappingParser(
                 val type = desc.removeSuffix("[]")
 
                 Type.getType("[" + toTypeIdentifier(type).descriptor)
-            } else dev.extframework.archive.mapper.parsers.proguard.classToType(desc.replace('.', '/'))
+            } else classToType(desc.replace('.', '/'))
         }
     }
 }
