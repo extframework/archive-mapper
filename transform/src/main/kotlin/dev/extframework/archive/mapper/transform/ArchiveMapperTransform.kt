@@ -19,9 +19,15 @@ internal fun ClassInheritancePath.toCheck(): List<String> {
 }
 
 public fun mappingTransformConfigFor(
-    context: ArchiveTransformerContext,
+    mappings: ArchiveMapping,
+    srcNamespace: String,
+    dstNamespace: String,
+    inheritanceTree: ClassInheritanceTree,
 ): TransformerConfig.Mutable {
-    val remapper = ArchiveRemapper(context)
+    val remapper = ArchiveRemapper(
+        mappings, srcNamespace, dstNamespace, inheritanceTree
+    )
+
     return TransformerConfig.of {
         transformClass {
             val newNode = ClassNode()
@@ -35,14 +41,15 @@ public fun mappingTransformConfigFor(
 
 
 // Archive transforming context
-public data class ArchiveTransformerContext(
-    val theArchive: ArchiveReference,
-    val dependencies: List<ArchiveTree>,
-    val mappings: ArchiveMapping,
-    val fromNamespace: String,
-    val toNamespace: String,
-    val inheritanceTree: ClassInheritanceTree
-)
+//public data class ArchiveTransformerContext(
+////    val theArchive: ArchiveReference,
+////    val dependencies: List<ArchiveTree>,
+//
+//    val mappings: ArchiveMapping,
+//    val fromNamespace: String,
+//    val toNamespace: String,
+//    val inheritanceTree: ClassInheritanceTree
+//)
 
 internal fun InputStream.classNode(parsingOptions: Int = 0): ClassNode {
     val node = ClassNode()
@@ -52,7 +59,11 @@ internal fun InputStream.classNode(parsingOptions: Int = 0): ClassNode {
 
 private fun ArchiveReference.transformAndWriteClass(
     name: String, // Fake location
-    context: ArchiveTransformerContext,
+    mappings: ArchiveMapping,
+    srcNamespace: String,
+    dstNamespace: String,
+    archive: ArchiveReference,
+    dependencies: List<ArchiveTree>,
     config: TransformerConfig
 ) {
     val entry = checkNotNull(
@@ -64,12 +75,12 @@ private fun ArchiveReference.transformAndWriteClass(
         config,
         MappingAwareClassWriter(
             config,
-            context
+            mappings, srcNamespace, dstNamespace, archive, dependencies
         ),
         ClassReader.EXPAND_FRAMES
     )
 
-    val transformedName = context.mappings.mapClassName(name, context.fromNamespace, context.toNamespace) ?: name
+    val transformedName = mappings.mapClassName(name, srcNamespace, dstNamespace) ?: name
     val transformedEntry = ArchiveReference.Entry(
         "$transformedName.class",
         streamToResource(entry.resource.location) {
@@ -86,18 +97,22 @@ private fun ArchiveReference.transformAndWriteClass(
 
 private class MappingAwareClassWriter(
     private val config: TransformerConfig,
-    private val context: ArchiveTransformerContext
+    private val mappings: ArchiveMapping,
+    private val srcNamespace: String,
+    private val dstNamespace: String,
+    private val archive: ArchiveReference,
+    dependencies: List<ArchiveTree>,
 ) : AwareClassWriter(
-    context.dependencies,
+    dependencies,
     0,
 ) {
     private fun getMappedNode(name: String): HierarchyNode? {
-        var node = context.theArchive.reader["$name.class"]
+        var node = archive.reader["$name.class"]
             ?.resource?.openStream()?.classNode(ClassReader.EXPAND_FRAMES) ?: run {
             val otherName =
                 // Switch it as we want to go the other direction
-                context.mappings.mapClassName(name, context.toNamespace, context.fromNamespace) ?: return@run null
-            context.theArchive.reader["$otherName.class"]?.resource?.openStream()
+                mappings.mapClassName(name, srcNamespace, dstNamespace) ?: return@run null
+            archive.reader["$otherName.class"]?.resource?.openStream()
         }?.classNode(ClassReader.EXPAND_FRAMES) ?: return null
 
         node = config.ct(node)
@@ -173,13 +188,21 @@ public fun transformArchive(
 ) {
     val inheritanceTree: ClassInheritanceTree = createFakeInheritanceTree(archive.reader)
 
-    val context = ArchiveTransformerContext(archive, dependencies, mappings, fromNamespace, toNamespace, inheritanceTree)
-
-    val config = mappingTransformConfigFor(context)
+    val config = mappingTransformConfigFor(
+        mappings, fromNamespace, toNamespace, inheritanceTree
+    )
 
     archive.reader.entries()
         .filter { it.name.endsWith(".class") }
         .forEach { e ->
-            archive.transformAndWriteClass(e.name.removeSuffix(".class"), context, config)
+            archive.transformAndWriteClass(
+                e.name.removeSuffix(".class"),
+                mappings,
+                fromNamespace,
+                toNamespace,
+                archive,
+                dependencies,
+                config
+            )
         }
 }

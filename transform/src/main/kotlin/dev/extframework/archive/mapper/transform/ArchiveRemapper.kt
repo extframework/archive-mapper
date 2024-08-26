@@ -1,19 +1,18 @@
 package dev.extframework.archive.mapper.transform
 
+import dev.extframework.archive.mapper.ArchiveMapping
 import org.objectweb.asm.commons.Remapper
 
-// TODO do this eventually, hard with the way they have implemented Invoke Dynamic instructions though
-internal class ArchiveRemapper(
-    private val context: ArchiveTransformerContext,
+public class ArchiveRemapper(
+    private val mappings: ArchiveMapping,
+    private val srcNamespace: String,
+    private val dstNamespace: String,
+    private val inheritanceTree: ClassInheritanceTree
 ) : Remapper() {
-    private val srcNamespace: String by context::fromNamespace
-    private val dstNamespace: String by context::toNamespace
-    private val mappings by context::mappings
-
     override fun mapMethodName(owner: String, name: String, descriptor: String): String {
         if (owner.startsWith("[")) return name
 
-        return context.inheritanceTree[owner]?.toCheck()?.firstNotNullOfOrNull {
+        return inheritanceTree[owner]?.toCheck()?.firstNotNullOfOrNull {
             mappings.mapMethodName(
                 it,
                 name,
@@ -34,7 +33,7 @@ internal class ArchiveRemapper(
     }
 
     override fun mapFieldName(owner: String, name: String, descriptor: String?): String {
-        return context.inheritanceTree[owner]?.toCheck()?.firstNotNullOfOrNull {
+        return inheritanceTree[owner]?.toCheck()?.firstNotNullOfOrNull {
             mappings.mapFieldName(
                 it,
                 name,
