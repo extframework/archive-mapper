@@ -19,8 +19,8 @@ import java.util.jar.JarOutputStream
 class TestArchiveMapping {
     @Test
     fun `Map Archive`() {
-        val resourceIn = this::class.java.getResource("/minecraft-1.20.1.jar")!!
-        val mappingsIn = this::class.java.getResourceAsStream("/minecraft-mappings-1.20.1.txt")!!
+        val resourceIn = this::class.java.getResource("/minecraft-1.21.jar")!!
+        val mappingsIn = this::class.java.getResourceAsStream("/client-mappings-1.21.txt")!!
 
         val path = Path.of(resourceIn.file)
         val archive = Archives.find(path, Archives.Finders.ZIP_FINDER)
@@ -60,7 +60,7 @@ class TestArchiveMapping {
                 target.closeEntry()
             }
         }
-        val resolve = Files.createTempDirectory("out") resolve "out.jar"
+        val resolve = Path.of("src/test/resources/mapped.jar").toAbsolutePath()
         println()
         println(resolve)
 
@@ -69,7 +69,7 @@ class TestArchiveMapping {
 
     @Test
     fun `Map Archive to intermediary`() {
-        val resourceIn = this::class.java.getResource("/minecraft-1.20.1.jar")!!
+        val resourceIn = this::class.java.getResource("/minecraft-1.21.jar")!!
         val mappingsIn =
             URL("https://raw.githubusercontent.com/FabricMC/intermediary/master/mappings/1.20.1.tiny").openStream()
 
@@ -112,7 +112,7 @@ class TestArchiveMapping {
                 target.closeEntry()
             }
         }
-        val resolve = Files.createTempDirectory("out") resolve "out.jar"
+        val resolve = Path.of("src/test/resources/mapped-intermediary.jar").toAbsolutePath()
         println()
         println(resolve)
 

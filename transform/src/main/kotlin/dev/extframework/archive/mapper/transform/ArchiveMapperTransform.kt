@@ -15,7 +15,7 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 
 internal fun ClassInheritancePath.toCheck(): List<String> {
-    return listOf(name) + interfaces.flatMap { it.toCheck() } + (superClass?.toCheck() ?: listOf())
+    return listOf(name) + (superClass?.toCheck() ?: listOf()) + interfaces.flatMap { it.toCheck() }
 }
 
 public fun mappingTransformConfigFor(
