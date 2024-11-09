@@ -4,7 +4,7 @@ import dev.extframework.gradle.common.extFramework
 plugins {
     kotlin("jvm") version "1.9.21"
 
-    id("dev.extframework.common") version "1.0.5"
+    id("dev.extframework.common") version "1.0.31"
 }
 
 tasks.wrapper {
@@ -38,7 +38,7 @@ allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     group = "dev.extframework"
-    version = "1.3.1-SNAPSHOT"
+    version = "1.3.2-SNAPSHOT"
 
     repositories {
         mavenCentral()
@@ -47,6 +47,10 @@ allprojects {
 
     configurations.all {
         resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+
+    java {
+        toolchain.languageVersion.set(JavaLanguageVersion.of(8))
     }
 
     kotlin {
