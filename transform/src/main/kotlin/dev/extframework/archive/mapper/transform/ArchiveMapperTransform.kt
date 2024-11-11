@@ -3,14 +3,19 @@ package dev.extframework.archive.mapper.transform
 import com.durganmcbroom.resources.openStream
 import com.durganmcbroom.resources.streamToResource
 import dev.extframework.archive.mapper.ArchiveMapping
+import dev.extframework.archive.mapper.ClassIdentifier
+import dev.extframework.archive.mapper.MethodIdentifier
 import dev.extframework.archives.ArchiveReference
 import dev.extframework.archives.ArchiveTree
 import dev.extframework.archives.Archives
+import dev.extframework.archives.extension.toMethod
 import dev.extframework.archives.transform.AwareClassWriter
 import dev.extframework.archives.transform.TransformerConfig
 import org.objectweb.asm.ClassReader
+import org.objectweb.asm.Opcodes
 import org.objectweb.asm.commons.ClassRemapper
 import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.ParameterNode
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
@@ -33,6 +38,33 @@ public fun mappingTransformConfigFor(
             val newNode = ClassNode()
             val classRemapper = ClassRemapper(newNode, remapper)
             it.accept(classRemapper)
+
+            newNode.methods.forEach { method ->
+                val classNode = mappings.classes[ClassIdentifier(newNode.name, dstNamespace)] ?: return@forEach
+
+                val mappingNode = classNode.methods[MethodIdentifier(
+                    method.toMethod(),
+                    dstNamespace,
+                )] ?: return@forEach
+
+                if (mappingNode.parameterNames.isNotEmpty()) {
+                    method.parameters = ArrayList()
+
+                    var lastIndex = 0
+
+                    mappingNode.parameterNames.forEach { (i, it) ->
+                        (lastIndex until i).forEach { pI ->
+                            method.parameters.add(ParameterNode("arg${pI}", Opcodes.ACC_SYNTHETIC))
+                        }
+                        lastIndex = i + 1
+
+                       method.parameters.add(ParameterNode(
+                            it[dstNamespace] ?: "arg${i}",
+                            Opcodes.ACC_SYNTHETIC,
+                        ))
+                    }
+                }
+            }
 
             newNode
         }
