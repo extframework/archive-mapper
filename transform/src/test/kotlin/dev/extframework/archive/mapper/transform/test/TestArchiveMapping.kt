@@ -15,6 +15,7 @@ import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
+import kotlin.io.path.Path
 
 class TestArchiveMapping {
     @Test
@@ -22,7 +23,7 @@ class TestArchiveMapping {
         val resourceIn = this::class.java.getResource("/minecraft-1.21.jar")!!
         val mappingsIn = this::class.java.getResourceAsStream("/client-mappings-1.21.txt")!!
 
-        val path = Path.of(resourceIn.file)
+        val path = Path(resourceIn.file)
         val archive = Archives.find(path, Archives.Finders.ZIP_FINDER)
 
         fun File.childPaths() : List<Path> {
@@ -60,7 +61,7 @@ class TestArchiveMapping {
                 target.closeEntry()
             }
         }
-        val resolve = Path.of("src/test/resources/mapped.jar").toAbsolutePath()
+        val resolve = Path("src/test/resources/mapped.jar").toAbsolutePath()
         println()
         println(resolve)
 
@@ -74,7 +75,7 @@ class TestArchiveMapping {
             URL("https://raw.githubusercontent.com/FabricMC/intermediary/master/mappings/1.20.1.tiny").openStream()
 
 
-        val path = Path.of(resourceIn.file)
+        val path = Path(resourceIn.file)
         val archive = Archives.find(path, Archives.Finders.ZIP_FINDER)
 
         fun File.childPaths() : List<Path> {
@@ -112,7 +113,7 @@ class TestArchiveMapping {
                 target.closeEntry()
             }
         }
-        val resolve = Path.of("src/test/resources/mapped-intermediary.jar").toAbsolutePath()
+        val resolve = Path("src/test/resources/mapped-intermediary.jar").toAbsolutePath()
         println()
         println(resolve)
 

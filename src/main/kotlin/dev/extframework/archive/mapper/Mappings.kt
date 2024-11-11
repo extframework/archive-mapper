@@ -1,6 +1,7 @@
 package dev.extframework.archive.mapper
 
 import org.objectweb.asm.Type
+import org.objectweb.asm.commons.Method
 
 public data class ArchiveMapping(
     override val namespaces: Set<String>,
@@ -11,18 +12,7 @@ public data class ArchiveMapping(
 
 public data class ArchiveIdentifier(
     override val name: String, override val namespace: String
-
-) : MappingIdentifier {
-//    override val name: String = ""
-//
-//    public data object Real : ArchiveIdentifier() {
-//        override val type: String = MappingType.REAL
-//    }
-//
-//    public data object Fake : ArchiveIdentifier() {
-//        override val type: MappingType = MappingType.FAKE
-//    }
-}
+) : MappingIdentifier
 
 public data class ClassMapping(
     override val namespaces: Set<String>,
@@ -38,17 +28,22 @@ public data class ClassIdentifier(
 
 public data class MethodMapping(
     override val namespaces: Set<String>,
-    override val identifiers: MappingValueContainer< MethodIdentifier>,
+    override val identifiers: MappingValueContainer<MethodIdentifier>,
 
     public val lnStart: MappingValueContainer<Int>?,
     public val lnEnd: MappingValueContainer<Int>?,
 
     public val returnType: MappingValueContainer<Type>,
+    // Parameter indices are 0 based despite `this` or static methods. Parameter 0 will always be the
+    // first parameter as shows up naturally in java.
+    public val parameterNames: List<IndexedValue<MappingValueContainer<String>>> = ArrayList()
 ) : MappingNode<MethodIdentifier>
 
 public data class MethodIdentifier(
     override val name: String, val parameters: List<Type>, override val namespace: String
-) : MappingIdentifier
+) : MappingIdentifier {
+    public constructor(method: Method, namespace: String) : this(method.name, method.argumentTypes.toList(), namespace)
+}
 
 public data class FieldMapping(
     override val namespaces: Set<String>,

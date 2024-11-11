@@ -1,14 +1,9 @@
 package dev.extframework.archive.mapper
 
-//public interface MappingContainer {
-//    public val namespaces: Set<String>
-//}
-
 public interface MappingNodeContainer<T : MappingIdentifier, out N : MappingNode<T>> {
     public val values: Set<N>
 
     public operator fun get(identifier: T): N?
-
 }
 
 public interface MappingValueContainer<out K> {
