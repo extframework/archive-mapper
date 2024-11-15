@@ -2,6 +2,7 @@ package dev.extframework.archive.mapper
 
 import java.lang.IllegalStateException
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.collections.HashSet
 
@@ -10,10 +11,16 @@ public interface MappingsGraph {
         val from: String, val to: String, val provider: MappingsProvider
     )
 
+    public val strict: Boolean
+
     public fun connectingEdges(type: String): List<ProviderEdge>
 }
 
-public fun newMappingsGraph(list: List<MappingsProvider>): MappingsGraph = object : MappingsGraph {
+@JvmOverloads
+public fun newMappingsGraph(
+    list: List<MappingsProvider>,
+    strict: Boolean = true,
+): MappingsGraph = object : MappingsGraph {
     // ChatGPT
     private fun generateNamespaceEdges(providers: List<MappingsProvider>): Map<String, List<MappingsGraph.ProviderEdge>> {
         return providers.flatMap { provider ->
@@ -26,6 +33,8 @@ public fun newMappingsGraph(list: List<MappingsProvider>): MappingsGraph = objec
     }
 
     val outEdges: Map<String, List<MappingsGraph.ProviderEdge>> = generateNamespaceEdges(list)
+
+    override val strict: Boolean = strict
 
     override fun connectingEdges(type: String): List<MappingsGraph.ProviderEdge> {
         return outEdges[type] ?: listOf()
@@ -59,7 +68,7 @@ public fun MappingsGraph.findShortest(
         val current = perimeter.remove()
         if (!visited.add(current)) continue
 
-        if (current == namespaceTo) return createProviderFrom(edgeTo, namespaceTo, namespaceFrom)
+        if (current == namespaceTo) return createProviderFrom(edgeTo, namespaceTo, namespaceFrom, strict)
 
         for (currentEdge in connectingEdges(current)) {
             perimeter.add(currentEdge.to)
@@ -80,7 +89,10 @@ public fun MappingsGraph.findShortest(
 }
 
 private fun createProviderFrom(
-    edges: Map<String, MappingsGraph.ProviderEdge>, typeTo: String, typeFrom: String
+    edges: Map<String, MappingsGraph.ProviderEdge>,
+    typeTo: String,
+    typeFrom: String,
+    strict: Boolean
 ): MappingsProvider {
     fun createPath(vertex: String): List<MappingsGraph.ProviderEdge> {
         val edge = edges[vertex] ?: return listOf()
@@ -100,7 +112,7 @@ private fun createProviderFrom(
                 )
             }
 
-            return joinMappings(path)
+            return joinMappings(path, strict)
         }
     }
 }
@@ -132,20 +144,36 @@ private fun <K, V> Collection<V>.doublyAssociateBy(
 }
 
 private fun <T, R, K> List<T>.foldingMap(
-    initial: R, mapper: (R, T) -> Pair<K, R>
-): Pair<List<K>, R> {
+    initial: R, mapper: (R, T) -> Pair<K, R>?
+): Pair<List<K>, R>? {
     var accumulator = initial
 
-    return map {
-        val pair = mapper(accumulator, it)
+    return (mapUnlessNull {
+        val pair = mapper(accumulator, it) ?: return@mapUnlessNull null
         accumulator = pair.second
         pair.first
-    } to accumulator
+    } ?: return null) to accumulator
+}
+
+private inline fun <T, R> List<T>.mapUnlessNull(
+    transformer: (T) -> R?
+): List<R>? {
+    val result = ArrayList<R>()
+
+    for (item in this) {
+        result.add(transformer(item) ?: return null)
+    }
+
+    return result
 }
 
 
 // We assume that the order given to us is from fake to real, thats how this archive will be built.
-public fun joinMappings(path: List<DirectedMappingNode<ArchiveMapping>>): ArchiveMapping {
+@JvmOverloads
+public fun joinMappings(
+    path: List<DirectedMappingNode<ArchiveMapping>>,
+    strict: Boolean = true
+): ArchiveMapping {
     if (path.size == 1) return path.first().node
     val fromNS = path.first().from.namespace
     val toNS = path.last().to.namespace
@@ -158,15 +186,16 @@ public fun joinMappings(path: List<DirectedMappingNode<ArchiveMapping>>): Archiv
         MappingNodeContainerImpl(path.first().node.classes.values
             .asSequence()
             .map { path.first().from.get(it) }
-            .mapTo(HashSet()) { fromClassIdentifier: ClassIdentifier ->
+            .mapNotNullTo(HashSet()) classMap@{ fromClassIdentifier: ClassIdentifier ->
                 val (classes, toClassIdentifier: ClassIdentifier) = path.foldingMap(fromClassIdentifier) { acc, it ->
                     val node = it.node.classes[acc]
-                        ?: throw IllegalStateException("Failed to follow reference chain from $fromNS to $toNS in class: '${fromClassIdentifier.name}' to appropriate remapping.")
+                        ?: if (strict) throw IllegalStateException("Failed to follow reference chain from $fromNS to $toNS in class: '${fromClassIdentifier.name}' to appropriate remapping.")
+                        else return@foldingMap null
 
                     DirectedMappingNode(
                         it.from, it.to, node
                     ) to it.to.get(node)
-                }
+                } ?: return@classMap null
 
                 ClassMapping(
                     namespaces,
@@ -177,15 +206,16 @@ public fun joinMappings(path: List<DirectedMappingNode<ArchiveMapping>>): Archiv
                         )
                     ),
                     MappingNodeContainerImpl(classes.first().node.methods.values.map { classes.first().from.get(it) }
-                        .mapTo(HashSet()) { fromMethodIdentifier ->
+                        .mapNotNullTo(HashSet()) methodMap@{ fromMethodIdentifier ->
                             val (methods, toMethodIdentifier) = classes.foldingMap(fromMethodIdentifier) { acc, it ->
                                 val methodNode = it.node.methods[acc]
-                                    ?: throw IllegalStateException("Failed to follow reference chain from ${fromMethodIdentifier.namespace} method: '${fromMethodIdentifier.name}' to appropriate remapping. In ${fromClassIdentifier.namespace} class '${fromClassIdentifier.name}'")
+                                    ?: if (strict) throw IllegalStateException("Failed to follow reference chain from ${fromMethodIdentifier.namespace} method: '${fromMethodIdentifier.name}' to appropriate remapping. In ${fromClassIdentifier.namespace} class '${fromClassIdentifier.name}'")
+                                    else return@foldingMap null
 
                                 DirectedMappingNode(
                                     it.from, it.to, methodNode
                                 ) to it.to.get(methodNode)
-                            }
+                            } ?: return@methodMap null
 
                             // By default fake is the first, real is the last
                             val (toRT, fromRT) = (run {
@@ -210,19 +240,20 @@ public fun joinMappings(path: List<DirectedMappingNode<ArchiveMapping>>): Archiv
                                     mapOf(
                                         toNS to toRT, fromNS to fromRT
                                     )
-                                )
+                                ),
                             )
                         }),
                     MappingNodeContainerImpl(classes.first().node.fields.values.map { classes.first().from.get(it) }
-                        .mapTo(HashSet()) { fromFieldIdentifier ->
+                        .mapNotNullTo(HashSet()) fieldMap@ { fromFieldIdentifier ->
                             val (fields, toFieldIdentifier) = classes.foldingMap(fromFieldIdentifier) { acc, it ->
                                 val fieldNode = it.node.fields[acc]
-                                    ?: throw IllegalStateException("Failed to follow reference chain from ${fromFieldIdentifier.namespace} field: '${fromFieldIdentifier.name}' to appropriate remapping. In ${fromClassIdentifier.namespace} class '${fromClassIdentifier.name}'")
+                                    ?: if (strict) throw IllegalStateException("Failed to follow reference chain from ${fromFieldIdentifier.namespace} field: '${fromFieldIdentifier.name}' to appropriate remapping. In ${fromClassIdentifier.namespace} class '${fromClassIdentifier.name}'")
+                                    else return@foldingMap null
 
                                 DirectedMappingNode(
                                     it.from, it.to, fieldNode
                                 ) to it.to.get(fieldNode)
-                            }
+                            } ?: return@fieldMap null
 
                             val (toType, fromType) = run {
                                 val directed = fields.last()

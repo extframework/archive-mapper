@@ -239,8 +239,7 @@ class TestMappingGraph {
         val joined = joinMappings(path)
         check(joined == mapping1)
     }
-//
-//    // Basic example of fake-real to real-fake to real-fake
+
     @Test
     fun `Test joining multiple mappings returns correctly`() {
         val path = listOf(
@@ -343,7 +342,6 @@ class TestMappingGraph {
         )
 
         val output = graph.findShortest("intermediary", "official(deobf)")
-
     }
 
     @Test
@@ -362,9 +360,9 @@ class TestMappingGraph {
             override val namespaces: Set<String> = setOf("official(deobf)", "official")
 
             override fun forIdentifier(identifier: String): ArchiveMapping {
-                check(identifier == "1.21")
+                check(identifier == "1.21.1")
                 return ProGuardMappingParser("official", "official(deobf)").parse(
-                    URL("https://piston-data.mojang.com/v1/objects/0530a206839eb1e9b35ec86acbbe394b07a2d9fb/client.txt").openStream()
+                    URL("https://piston-data.mojang.com/v1/objects/2244b6f072256667bcd9a73df124d6c58de77992/client.txt").openStream()
                 )
             }
         }
@@ -373,15 +371,15 @@ class TestMappingGraph {
             listOf(
                 officialProvider,
                 intermediaryProvider
-            )
+            ),
+            false
         )
 
         val provider = graph.findShortest(
-            "intermediary", "official(deobf)"
+             "official(deobf)", "intermediary",
         )
 
-        val forIdentifier = provider.forIdentifier("1.21")
+        val forIdentifier = provider.forIdentifier("1.21.1")
         println("")
-
     }
 }

@@ -10,7 +10,6 @@ import dev.extframework.common.util.Hex
 import dev.extframework.common.util.copyTo
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.resolve
-import java.io.BufferedReader
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.file.Path
