@@ -1,7 +1,5 @@
 package dev.extframework.archive.mapper.transform
 
-import com.durganmcbroom.resources.openStream
-import com.durganmcbroom.resources.streamToResource
 import dev.extframework.archive.mapper.ArchiveMapping
 import dev.extframework.archive.mapper.ClassIdentifier
 import dev.extframework.archive.mapper.MethodIdentifier
@@ -103,7 +101,7 @@ private fun ArchiveReference.transformAndWriteClass(
     ) { "Failed to find class '$name' when transforming archive: '${this.name}'" }
 
     val resolve = Archives.resolve(
-        ClassReader(entry.resource.openStream()),
+        ClassReader(entry.open()),
         config,
         MappingAwareClassWriter(
             config,
@@ -115,12 +113,11 @@ private fun ArchiveReference.transformAndWriteClass(
     val transformedName = mappings.mapClassName(name, srcNamespace, dstNamespace) ?: name
     val transformedEntry = ArchiveReference.Entry(
         "$transformedName.class",
-        streamToResource(entry.resource.location) {
-            ByteArrayInputStream(resolve)
-        },
         false,
         this
-    )
+    ) {
+        ByteArrayInputStream(resolve)
+    }
 
     if (transformedName != name)
         writer.remove("$name.class")
@@ -140,11 +137,11 @@ private class MappingAwareClassWriter(
 ) {
     private fun getMappedNode(name: String): HierarchyNode? {
         var node = archive.reader["$name.class"]
-            ?.resource?.openStream()?.classNode(ClassReader.EXPAND_FRAMES) ?: run {
+            ?.open()?.classNode(ClassReader.EXPAND_FRAMES) ?: run {
             val otherName =
                 // Switch it as we want to go the other direction
                 mappings.mapClassName(name, srcNamespace, dstNamespace) ?: return@run null
-            archive.reader["$otherName.class"]?.resource?.openStream()
+            archive.reader["$otherName.class"]?.open()
         }?.classNode(ClassReader.EXPAND_FRAMES) ?: return null
 
         node = config.ct(node)
@@ -175,7 +172,7 @@ public fun createFakeInheritancePath(
     entry: ArchiveReference.Entry,
     reader: ArchiveReference.Reader
 ): ClassInheritancePath {
-    val node = entry.resource.openStream().classNode()
+    val node = entry.open().classNode()
 
     return ClassInheritancePath(
         node.name,
