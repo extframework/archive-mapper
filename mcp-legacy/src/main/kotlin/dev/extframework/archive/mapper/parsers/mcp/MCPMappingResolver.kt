@@ -3,13 +3,18 @@ package dev.extframework.archive.mapper.parsers.mcp
 import com.durganmcbroom.resources.Resource
 import com.durganmcbroom.resources.ResourceAlgorithm
 import com.durganmcbroom.resources.VerifiedResource
+import com.durganmcbroom.resources.asResourceStream
 import com.durganmcbroom.resources.toResource
 import dev.extframework.archives.Archives
 import dev.extframework.archives.extension.Method
+import dev.extframework.archives.zip.ZipFinder
 import dev.extframework.common.util.Hex
 import dev.extframework.common.util.copyTo
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.resolve
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.file.Path
@@ -20,9 +25,11 @@ public object MCPMappingResolver {
     // 1 = channel, 2 = mapping version, 3 = mc version
     private const val baseMappingUrl =
         "https://maven.minecraftforge.net/de/oceanlabs/mcp/mcp_%1\$s/%2\$s-%3\$s/mcp_%1\$s-%2\$s-%3\$s.zip"
+
     // 1 = mc ver
     private const val newBaseSrgUrl =
         "https://maven.minecraftforge.net/de/oceanlabs/mcp/mcp_config/%1\$s/mcp_config-%1\$s.zip"
+
     // 1 = mc ver
     private const val oldBaseSrgUrl =
         "https://maven.minecraftforge.net/de/oceanlabs/mcp/mcp/%1\$s/mcp-%1\$s-srg.zip"
@@ -33,10 +40,10 @@ public object MCPMappingResolver {
         mcVersion: String,
         channel: String,
         mcpVersion: String,
-    ) : Path {
+    ): Path = runBlocking {
         val outPath = path resolve "rich_mappings.csv"
 
-        if (outPath.exists()) return outPath
+        if (outPath.exists()) return@runBlocking outPath
 
         val mappingResource = String.format(baseMappingUrl, channel, mcpVersion, mcVersion).mcpResource()
 
@@ -131,9 +138,10 @@ public object MCPMappingResolver {
                     )
 
                     val parameters = if (methodData != null) {
-                        val parameterSuffix = "p_${methodData.searge
-                            .substringAfter("_")
-                            .substringBeforeLast("_")
+                        val parameterSuffix = "p_${
+                            methodData.searge
+                                .substringAfter("_")
+                                .substringBeforeLast("_")
                         }_"
 
                         // Unfortunately, MCP decided it was a good idea to base parameter start index on whether it was static or not.
@@ -173,11 +181,11 @@ public object MCPMappingResolver {
             listOf(it.type.descriptor, it.key, it.value, it.comment)
         }
 
-        return outPath
+        outPath
     }
 
     // Given a resource, download it and unzip it (assuming it's a zip)
-    private fun unpackIn(
+    private suspend fun unpackIn(
         resource: Resource,
         name: String,
         path: Path
@@ -187,17 +195,22 @@ public object MCPMappingResolver {
 
         resource copyTo zipPath
 
-        Archives.find(zipPath, Archives.Finders.ZIP_FINDER).use { archive ->
-            archive.reader.entries()
-                .filterNot { it.isDirectory }
-                .forEach { entry ->
-
-                    entry.resource copyTo (unpackedPath resolve entry.name)
-                }
+        withContext(Dispatchers.IO) {
+            Archives.find(zipPath, ZipFinder).use { archive ->
+                archive.reader.entries()
+                    .filterNot { it.isDirectory }
+                    .forEach { entry ->
+                        entry.open().use { fin ->
+                            FileOutputStream((unpackedPath resolve entry.name).toFile()).use { fout ->
+                                fin.copyTo(fout)
+                            }
+                        }
+                    }
+            }
         }
     }
 
-    private fun String.mcpResource(): Resource {
+    private suspend fun String.mcpResource(): Resource {
         val digestUrl = "$this.sha1"
 
         val rawResource = URL(this).toResource()

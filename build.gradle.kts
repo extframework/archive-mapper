@@ -4,7 +4,7 @@ import dev.extframework.gradle.common.extFramework
 plugins {
     kotlin("jvm") version "1.9.21"
 
-    id("dev.extframework.common") version "1.0.33"
+    id("dev.extframework.common") version "1.0.43"
 }
 
 tasks.wrapper {
@@ -38,11 +38,12 @@ allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     group = "dev.extframework"
-    version = "1.3.4-SNAPSHOT"
+    version = "1.3.5-SNAPSHOT"
 
     repositories {
         mavenCentral()
         extFramework()
+        mavenLocal()
     }
 
     configurations.all {
