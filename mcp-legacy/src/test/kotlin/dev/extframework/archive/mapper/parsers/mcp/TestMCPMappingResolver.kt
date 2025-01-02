@@ -1,6 +1,5 @@
 package dev.extframework.archive.mapper.parsers.mcp
 
-import com.durganmcbroom.resources.openStream
 import dev.extframework.archive.mapper.transform.transformArchive
 import dev.extframework.archives.Archives
 import dev.extframework.common.util.resolve
@@ -85,7 +84,7 @@ class TestMCPMappingResolver {
 
                 target.putNextEntry(entry)
 
-                val eIn = e.resource.openStream()
+                val eIn = e.open()
 
                 //Stolen from https://stackoverflow.com/questions/1281229/how-to-use-jaroutputstream-to-create-a-jar-file
                 val buffer = ByteArray(1024)
