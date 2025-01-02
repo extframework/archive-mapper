@@ -10,6 +10,7 @@ import dev.extframework.archives.extension.Method
 import dev.extframework.archives.zip.ZipFinder
 import dev.extframework.common.util.Hex
 import dev.extframework.common.util.copyTo
+import dev.extframework.common.util.make
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.resolve
 import kotlinx.coroutines.Dispatchers
@@ -201,6 +202,7 @@ public object MCPMappingResolver {
                     .filterNot { it.isDirectory }
                     .forEach { entry ->
                         entry.open().use { fin ->
+                            (unpackedPath resolve entry.name).make()
                             FileOutputStream((unpackedPath resolve entry.name).toFile()).use { fout ->
                                 fin.copyTo(fout)
                             }

@@ -38,7 +38,7 @@ allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     group = "dev.extframework"
-    version = "1.3.5-SNAPSHOT"
+    version = "1.3.6-SNAPSHOT"
 
     repositories {
         mavenCentral()
